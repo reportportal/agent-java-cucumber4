@@ -49,17 +49,17 @@ public class Utils {
     private static final String TABLE_SEPARATOR = "|";
     private static final String DOCSTRING_DECORATOR = "\n\"\"\"\n";
 
-    //@formatter:off
-	private static final Map<String, String> STATUS_MAPPING = ImmutableMap.<String, String>builder()
-			.put("passed", Statuses.PASSED)
-			.put("skipped", Statuses.SKIPPED)
-			//TODO replace with NOT_IMPLEMENTED in future
-			.put("undefined", Statuses.SKIPPED).build();
-	//@formatter:on
-
     private Utils() {
-
+        throw new AssertionError("No instances should exist for the class!");
     }
+
+    //@formatter:off
+    private static final Map<String, String> STATUS_MAPPING = ImmutableMap.<String, String>builder()
+            .put("passed", Statuses.PASSED)
+            .put("skipped", Statuses.SKIPPED)
+            //TODO replace with NOT_IMPLEMENTED in future
+            .put("undefined", Statuses.SKIPPED).build();
+    //@formatter:on
 
     public static void finishTestItem(Launch rp, Maybe<String> itemId) {
         finishTestItem(rp, itemId, null);
@@ -70,24 +70,20 @@ public class Utils {
             LOGGER.error("BUG: Trying to finish unspecified test item.");
             return;
         }
-
         FinishTestItemRQ rq = new FinishTestItemRQ();
         rq.setStatus(status);
         rq.setEndTime(Calendar.getInstance().getTime());
-
         rp.finishTestItem(itemId, rq);
-
     }
 
-    public static Maybe<String> startNonLeafNode(Launch rp, Maybe<String> rootItemId, String name, String description, Set<String> tags,
-                                                 String type) {
+    public static Maybe<String> startNonLeafNode(Launch rp, Maybe<String> rootItemId, String name, String description,
+                                                 Set<String> tags, String type) {
         StartTestItemRQ rq = new StartTestItemRQ();
         rq.setDescription(description);
         rq.setName(name);
         rq.setTags(tags);
         rq.setStartTime(Calendar.getInstance().getTime());
         rq.setType(type);
-
         return rp.startTestItem(rootItemId, rq);
     }
 
@@ -144,7 +140,7 @@ public class Utils {
      * @return regular log level
      */
     public static String mapLevel(String cukesStatus) {
-        String mapped = null;
+        String mapped;
         if (cukesStatus.equalsIgnoreCase("passed")) {
             mapped = "INFO";
         } else if (cukesStatus.equalsIgnoreCase("skipped")) {
@@ -184,7 +180,7 @@ public class Utils {
         List<PickleRow> table = null;
         String dockString = "";
         StringBuilder marg = new StringBuilder();
-        PickleStepTestStep pickleStep = (PickleStepTestStep)step;
+        PickleStepTestStep pickleStep = (PickleStepTestStep) step;
         if (!pickleStep.getStepArgument().isEmpty()) {
             Argument argument = pickleStep.getStepArgument().get(0);
             if (argument instanceof PickleString) {
@@ -211,13 +207,7 @@ public class Utils {
     }
 
     public static String getStepName(TestStep step) {
-        String stepName;
-        if (step instanceof HookTestStep) {
-            stepName = "Hook: " + ((HookTestStep)step).getHookType().toString();
-        } else {
-            stepName = ((PickleStepTestStep)step).getPickleStep().getText();
-        }
-
-        return stepName;
+        return step instanceof HookTestStep ? "Hook: " + ((HookTestStep) step).getHookType().toString() :
+                ((PickleStepTestStep) step).getPickleStep().getText();
     }
 }

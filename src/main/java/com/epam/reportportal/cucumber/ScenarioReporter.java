@@ -59,8 +59,10 @@ public class ScenarioReporter extends AbstractReporter {
 
     @Override
     protected void beforeStep(TestStep testStep) {
+        RunningContext.ScenarioContext currentScenarioContext = getCurrentScenarioContext();
         Step step = currentScenarioContext.getStep(testStep);
-        String decoratedStepName = decorateMessage(Utils.buildNodeName(currentScenarioContext.getStepPrefix(), step.getKeyword(), Utils.getStepName(testStep), " "));
+        String decoratedStepName = decorateMessage(Utils.buildNodeName(currentScenarioContext.getStepPrefix(),
+                step.getKeyword(), Utils.getStepName(testStep), " "));
         String multilineArg = Utils.buildMultilineArgument(testStep);
         Utils.sendLog(decoratedStepName + multilineArg, "INFO", null);
     }
@@ -111,7 +113,7 @@ public class ScenarioReporter extends AbstractReporter {
      * Start root suite
      */
     protected void finishRootItem() {
-        Utils.finishTestItem(RP.get(), rootSuiteId.get());
+        Utils.finishTestItem(launch.get(), rootSuiteId.get());
         rootSuiteId = null;
     }
 
@@ -126,7 +128,7 @@ public class ScenarioReporter extends AbstractReporter {
                 rq.setName("Root User Story");
                 rq.setStartTime(Calendar.getInstance().getTime());
                 rq.setType("STORY");
-                return RP.get().startTestItem(rq);
+                return launch.get().startTestItem(rq);
             }
         });
     }

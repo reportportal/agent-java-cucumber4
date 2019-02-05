@@ -22,9 +22,12 @@ import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
-import cucumber.api.*;
+import cucumber.api.HookTestStep;
+import cucumber.api.HookType;
+import cucumber.api.Result;
+import cucumber.api.TestCase;
+import cucumber.api.TestStep;
 import cucumber.api.event.*;
-import cucumber.api.formatter.Formatter;
 import io.reactivex.Maybe;
 import org.apache.tika.mime.MimeTypeException;
 import org.apache.tika.mime.MimeTypes;
@@ -35,6 +38,8 @@ import rp.com.google.common.base.Suppliers;
 
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Abstract Cucumber 4.x formatter for Report Portal
@@ -44,19 +49,21 @@ import java.util.Date;
  * @author Serhii Zharskyi
  * @author Vitaliy Tsvihun
  */
-public abstract class AbstractReporter implements Formatter {
+public abstract class AbstractReporter implements ConcurrentEventListener {
 
+    Supplier<Launch> launch;
+    static final String COLON_INFIX = ": ";
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReporter.class);
 
-    protected static final String COLON_INFIX = ": ";
+    private Map<String, RunningContext.FeatureContext> currentFeatureContextMap =
+            new HashMap<String, RunningContext.FeatureContext>();
 
-    /* feature context */
-    protected RunningContext.FeatureContext currentFeatureContext;
+    private Map<String, RunningContext.ScenarioContext> currentScenarioContextMap =
+            new HashMap<String, RunningContext.ScenarioContext>();
 
-    /* scenario context */
-    protected RunningContext.ScenarioContext currentScenarioContext;
+    private Map<Long, RunningContext.ScenarioContext> threadCurrentScenarioContextMap =
+            new HashMap<Long, RunningContext.ScenarioContext>();
 
-    protected Supplier<Launch> RP;
 
     /**
      * Registers an event handler for a specific event.
@@ -87,6 +94,10 @@ public abstract class AbstractReporter implements Formatter {
         publisher.registerHandlerFor(WriteEvent.class, getWriteEventHandler());
     }
 
+    protected RunningContext.ScenarioContext getCurrentScenarioContext() {
+        return threadCurrentScenarioContextMap.get(Thread.currentThread().getId());
+    }
+
     /**
      * Manipulations before the launch starts
      */
@@ -95,40 +106,26 @@ public abstract class AbstractReporter implements Formatter {
     }
 
     /**
-     * Finish RP launch
+     * Finish launch launch
      */
     protected void afterLaunch() {
         FinishExecutionRQ finishLaunchRq = new FinishExecutionRQ();
         finishLaunchRq.setEndTime(Calendar.getInstance().getTime());
-        RP.get().finish(finishLaunchRq);
-    }
-
-    /**
-     * Manipulations before the feature starts
-     */
-    protected void beforeFeature() {
-        startFeature();
-    }
-
-    /**
-     * Finish Cucumber feature
-     */
-    protected void afterFeature() {
-        Utils.finishTestItem(RP.get(), currentFeatureContext.getFeatureId());
-        currentFeatureContext = null;
+        launch.get().finish(finishLaunchRq);
     }
 
     /**
      * Start Cucumber scenario
      */
-    protected void beforeScenario() {
-        Maybe<String> id = Utils.startNonLeafNode(RP.get(),
+    private void beforeScenario(RunningContext.FeatureContext currentFeatureContext,
+                                RunningContext.ScenarioContext currentScenarioContext, String scenarioName) {
+        Maybe<String> id = Utils.startNonLeafNode(
+                launch.get(),
                 currentFeatureContext.getFeatureId(),
-                Utils.buildNodeName(currentScenarioContext.getKeyword(), AbstractReporter.COLON_INFIX, currentScenarioContext.getName(), currentScenarioContext.getOutlineIteration()),
+                scenarioName,
                 currentFeatureContext.getUri() + ":" + currentScenarioContext.getLine(),
                 currentScenarioContext.getTags(),
-                getScenarioTestItemType()
-        );
+                getScenarioTestItemType());
         currentScenarioContext.setId(id);
     }
 
@@ -136,33 +133,30 @@ public abstract class AbstractReporter implements Formatter {
      * Finish Cucumber scenario
      */
     protected void afterScenario(TestCaseFinished event) {
-        Utils.finishTestItem(RP.get(), currentScenarioContext.getId(), event.result.getStatus().toString());
-        currentScenarioContext = null;
-    }
-
-    /**
-     * Start Cucumber feature
-     */
-    protected void startFeature() {
-        StartTestItemRQ rq = new StartTestItemRQ();
-        Maybe<String> root = getRootItemId();
-        rq.setDescription(currentFeatureContext.getUri());
-        rq.setName(Utils.buildNodeName(currentFeatureContext.getFeature().getKeyword(), AbstractReporter.COLON_INFIX, currentFeatureContext.getFeature().getName(), null));
-        rq.setTags(currentFeatureContext.getTags());
-        rq.setStartTime(Calendar.getInstance().getTime());
-        rq.setType(getFeatureTestItemType());
-        if (null == root) {
-            currentFeatureContext.setFeatureId(RP.get().startTestItem(rq));
-        } else {
-            currentFeatureContext.setFeatureId(RP.get().startTestItem(root, rq));
+        RunningContext.ScenarioContext scontext = getCurrentScenarioContext();
+        String scenarioNameToDelete = "";
+        for (Map.Entry<String, RunningContext.ScenarioContext> scenarioContextVar : currentScenarioContextMap.entrySet()) {
+            if (scenarioContextVar.getValue().getLine() == scontext.getLine()) {
+                scenarioNameToDelete = scenarioContextVar.getKey();
+                break;
+            }
         }
+        Utils.finishTestItem(launch.get(), scontext.getId(), event.result.getStatus().toString());
+        currentScenarioContextMap.remove(scenarioNameToDelete);
+    }
+
+    private String getFeatureName(TestCase testCase) {
+        RunningContext.FeatureContext featureContext = new RunningContext.FeatureContext().processTestSourceReadEvent(testCase);
+        String featureKeyword = featureContext.getFeature().getKeyword();
+        String featureName = featureContext.getFeature().getName();
+        return Utils.buildNodeName(featureKeyword, AbstractReporter.COLON_INFIX, featureName, null);
     }
 
     /**
-     * Start RP launch
+     * Start launch launch
      */
     protected void startLaunch() {
-        RP = Suppliers.memoize(new Supplier<Launch>() {
+        launch = Suppliers.memoize(new Supplier<Launch>() {
 
             /* should no be lazy */
             private final Date startTime = Calendar.getInstance().getTime();
@@ -179,8 +173,7 @@ public abstract class AbstractReporter implements Formatter {
                 rq.setTags(parameters.getTags());
                 rq.setDescription(parameters.getDescription());
 
-                Launch launch = reportPortal.newLaunch(rq);
-                return launch;
+                return reportPortal.newLaunch(rq);
             }
         });
     }
@@ -223,14 +216,14 @@ public abstract class AbstractReporter implements Formatter {
     protected abstract void hookFinished(TestStep step, Result result, Boolean isBefore);
 
     /**
-     * Return RP test item name mapped to Cucumber feature
+     * Return launch test item name mapped to Cucumber feature
      *
      * @return test item name
      */
     protected abstract String getFeatureTestItemType();
 
     /**
-     * Return RP test item name mapped to Cucumber scenario
+     * Return launch test item name mapped to Cucumber scenario
      *
      * @return test item name
      */
@@ -341,7 +334,7 @@ public abstract class AbstractReporter implements Formatter {
         return new EventHandler<TestRunFinished>() {
             @Override
             public void receive(TestRunFinished event) {
-                if (currentFeatureContext != null) {
+                if (!currentFeatureContextMap.isEmpty()) {
                     handleEndOfFeature();
                 }
                 afterLaunch();
@@ -367,30 +360,61 @@ public abstract class AbstractReporter implements Formatter {
         };
     }
 
-    private void handleStartOfFeature(TestCase testCase) {
-        currentFeatureContext = new RunningContext.FeatureContext().processTestSourceReadEvent(testCase);
-        beforeFeature();
-    }
-
     private void handleEndOfFeature() {
-        afterFeature();
+        for (RunningContext.FeatureContext value : currentFeatureContextMap.values()) {
+            Utils.finishTestItem(launch.get(), value.getFeatureId());
+        }
+        currentFeatureContextMap.clear();
     }
 
     private void handleStartOfTestCase(TestCaseStarted event) {
         TestCase testCase = event.testCase;
+        String featureName = getFeatureName(testCase);
+        RunningContext.FeatureContext currentFeatureContext = currentFeatureContextMap.get(featureName);
         if (currentFeatureContext != null && !testCase.getUri().equals(currentFeatureContext.getUri())) {
-            handleEndOfFeature();
+            Utils.finishTestItem(launch.get(), currentFeatureContext.getFeatureId());
+            currentFeatureContextMap.remove(featureName);
         }
         if (currentFeatureContext == null) {
-            handleStartOfFeature(testCase);
+            currentFeatureContext = createFeatureContext(testCase, featureName);
         }
         if (!currentFeatureContext.getUri().equals(testCase.getUri())) {
             throw new IllegalStateException("Scenario URI does not match Feature URI.");
         }
+
+        RunningContext.ScenarioContext scenarioContext = currentFeatureContext.getScenarioContext(testCase);
+
+        String scenarioName = Utils.buildNodeName(scenarioContext.getKeyword(),
+                AbstractReporter.COLON_INFIX,
+                scenarioContext.getName(), scenarioContext.getOutlineIteration());
+
+        RunningContext.ScenarioContext currentScenarioContext = currentScenarioContextMap.get(scenarioName);
         if (currentScenarioContext == null) {
             currentScenarioContext = currentFeatureContext.getScenarioContext(testCase);
+            currentScenarioContextMap.put(scenarioName, currentScenarioContext);
+            threadCurrentScenarioContextMap.put(Thread.currentThread().getId(), currentScenarioContext);
         }
-        beforeScenario();
+        beforeScenario(currentFeatureContext, currentScenarioContext, scenarioName);
+    }
+
+    private RunningContext.FeatureContext createFeatureContext(TestCase testCase, String featureName) {
+        RunningContext.FeatureContext currentFeatureContext;
+        currentFeatureContext = new RunningContext.FeatureContext().processTestSourceReadEvent(testCase);
+        currentFeatureContextMap.put(featureName, currentFeatureContext);
+
+        StartTestItemRQ rq = new StartTestItemRQ();
+        Maybe<String> root = getRootItemId();
+        rq.setDescription(currentFeatureContext.getUri());
+        rq.setName(featureName);
+        rq.setTags(currentFeatureContext.getTags());
+        rq.setStartTime(Calendar.getInstance().getTime());
+        rq.setType(getFeatureTestItemType());
+        if (null == root) {
+            currentFeatureContext.setFeatureId(launch.get().startTestItem(rq));
+        } else {
+            currentFeatureContext.setFeatureId(launch.get().startTestItem(root, rq));
+        }
+        return currentFeatureContext;
     }
 
     private void handleTestStepStarted(TestStepStarted event) {
@@ -398,8 +422,8 @@ public abstract class AbstractReporter implements Formatter {
         if (testStep instanceof HookTestStep) {
             beforeHooks(isBefore(testStep));
         } else {
-            if (currentScenarioContext.withBackground()) {
-                currentScenarioContext.nextBackgroundStep();
+            if (getCurrentScenarioContext().withBackground()) {
+                getCurrentScenarioContext().nextBackgroundStep();
             }
             beforeStep(testStep);
         }
@@ -413,5 +437,4 @@ public abstract class AbstractReporter implements Formatter {
             afterStep(event.result);
         }
     }
-
 }
