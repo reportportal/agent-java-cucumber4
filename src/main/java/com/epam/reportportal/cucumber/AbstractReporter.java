@@ -106,7 +106,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
     }
 
     /**
-     * Finish launch launch
+     * Finish RP launch
      */
     protected void afterLaunch() {
         FinishExecutionRQ finishLaunchRq = new FinishExecutionRQ();
@@ -133,16 +133,16 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
      * Finish Cucumber scenario
      */
     protected void afterScenario(TestCaseFinished event) {
-        RunningContext.ScenarioContext scontext = getCurrentScenarioContext();
-        String scenarioNameToDelete = "";
-        for (Map.Entry<String, RunningContext.ScenarioContext> scenarioContextVar : currentScenarioContextMap.entrySet()) {
-            if (scenarioContextVar.getValue().getLine() == scontext.getLine()) {
-                scenarioNameToDelete = scenarioContextVar.getKey();
+        RunningContext.ScenarioContext currentScenarioContext = getCurrentScenarioContext();
+        String scenarioNameToDeleteFromContextMap = "";
+        for (Map.Entry<String, RunningContext.ScenarioContext> scenarioContext : currentScenarioContextMap.entrySet()) {
+            if (scenarioContext.getValue().getLine() == currentScenarioContext.getLine()) {
+                scenarioNameToDeleteFromContextMap = scenarioContext.getKey();
                 break;
             }
         }
-        Utils.finishTestItem(launch.get(), scontext.getId(), event.result.getStatus().toString());
-        currentScenarioContextMap.remove(scenarioNameToDelete);
+        Utils.finishTestItem(launch.get(), currentScenarioContext.getId(), event.result.getStatus().toString());
+        currentScenarioContextMap.remove(scenarioNameToDeleteFromContextMap);
     }
 
     private String getFeatureName(TestCase testCase) {
@@ -153,7 +153,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
     }
 
     /**
-     * Start launch launch
+     * Start RP launch
      */
     protected void startLaunch() {
         launch = Suppliers.memoize(new Supplier<Launch>() {
@@ -216,14 +216,14 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
     protected abstract void hookFinished(TestStep step, Result result, Boolean isBefore);
 
     /**
-     * Return launch test item name mapped to Cucumber feature
+     * Return RP launch test item name mapped to Cucumber feature
      *
      * @return test item name
      */
     protected abstract String getFeatureTestItemType();
 
     /**
-     * Return launch test item name mapped to Cucumber scenario
+     * Return RP launch test item name mapped to Cucumber scenario
      *
      * @return test item name
      */
