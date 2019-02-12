@@ -49,7 +49,7 @@ import java.util.Calendar;
 public class ScenarioReporter extends AbstractReporter {
     private static final String SEPARATOR = "-------------------------";
 
-    protected Supplier<Maybe<String>> rootSuiteId;
+    protected Supplier<Maybe<Long>> rootSuiteId;
 
     @Override
     protected void beforeLaunch() {
@@ -97,7 +97,7 @@ public class ScenarioReporter extends AbstractReporter {
 
 
     @Override
-    protected Maybe<String> getRootItemId() {
+    protected Maybe<Long> getRootItemId() {
         return rootSuiteId.get();
     }
 
@@ -119,9 +119,9 @@ public class ScenarioReporter extends AbstractReporter {
      * Start root suite
      */
     protected void startRootItem() {
-        rootSuiteId = Suppliers.memoize(new Supplier<Maybe<String>>() {
+        rootSuiteId = Suppliers.memoize(new Supplier<Maybe<Long>>() {
             @Override
-            public Maybe<String> get() {
+            public Maybe<Long> get() {
                 StartTestItemRQ rq = new StartTestItemRQ();
                 rq.setName("Root User Story");
                 rq.setStartTime(Calendar.getInstance().getTime());
