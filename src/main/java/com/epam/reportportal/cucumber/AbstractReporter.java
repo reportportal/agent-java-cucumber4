@@ -126,7 +126,8 @@ public abstract class AbstractReporter implements Formatter {
 	 * Start Cucumber scenario
 	 */
 	protected void beforeScenario() {
-		Maybe<Long> id = Utils.startNonLeafNode(RP.get(),
+		Maybe<Long> id = Utils.startNonLeafNode(
+				RP.get(),
 				currentFeatureContext.getFeatureId(),
 				Utils.buildNodeName(currentScenarioContext.getKeyword(),
 						AbstractReporter.COLON_INFIX,
@@ -155,7 +156,8 @@ public abstract class AbstractReporter implements Formatter {
 		StartTestItemRQ rq = new StartTestItemRQ();
 		Maybe<Long> root = getRootItemId();
 		rq.setDescription(currentFeatureContext.getUri());
-		rq.setName(Utils.buildNodeName(currentFeatureContext.getFeature().getKeyword(),
+		rq.setName(Utils.buildNodeName(
+				currentFeatureContext.getFeature().getKeyword(),
 				AbstractReporter.COLON_INFIX,
 				currentFeatureContext.getFeature().getName(),
 				null
@@ -191,10 +193,11 @@ public abstract class AbstractReporter implements Formatter {
 				rq.setAttributes(parameters.getAttributes() == null ? new HashSet<ItemAttributeResource>() : parameters.getAttributes());
 				rq.setDescription(parameters.getDescription());
 
-				final ItemAttributeResource skippedIssueAttr = new ItemAttributeResource(SKIPPED_ISSUE_KEY,
-						String.valueOf(parameters.getSkippedAnIssue()),
-						true
-				);
+				final Boolean skippedAnIssue = parameters.getSkippedAnIssue();
+				final ItemAttributeResource skippedIssueAttr = new ItemAttributeResource();
+				skippedIssueAttr.setKey(SKIPPED_ISSUE_KEY);
+				skippedIssueAttr.setValue(skippedAnIssue == null ? "true" : skippedAnIssue.toString());
+				skippedIssueAttr.setSystem(true);
 				rq.getAttributes().add(skippedIssueAttr);
 
 				Launch launch = reportPortal.newLaunch(rq);
