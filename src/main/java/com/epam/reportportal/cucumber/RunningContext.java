@@ -23,27 +23,11 @@ import gherkin.AstBuilder;
 import gherkin.Parser;
 import gherkin.ParserException;
 import gherkin.TokenMatcher;
-import gherkin.ast.Background;
-import gherkin.ast.Examples;
-import gherkin.ast.Feature;
-import gherkin.ast.GherkinDocument;
-import gherkin.ast.ScenarioDefinition;
-import gherkin.ast.ScenarioOutline;
-import gherkin.ast.Step;
-import gherkin.ast.TableRow;
+import gherkin.ast.*;
 import gherkin.pickles.PickleTag;
 import io.reactivex.Maybe;
 
-import java.util.ArrayDeque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
-
-import static com.epam.reportportal.cucumber.Utils.extractPickleTags;
-import static com.epam.reportportal.cucumber.Utils.extractTags;
+import java.util.*;
 
 
 /**
@@ -162,7 +146,7 @@ public class RunningContext {
 
 
     public static class ScenarioContext {
-        private static Map<Integer, ArrayDeque<String>> outlineIterationsMap = new HashMap<Integer, ArrayDeque<String>>();
+        private static Map<String, ArrayDeque<String>> outlineIterationsMap = new HashMap<String, ArrayDeque<String>>();
         private Maybe<String> id = null;
         private Background background;
         private ScenarioDefinition scenario;
@@ -198,12 +182,12 @@ public class RunningContext {
         void processScenarioOutline(ScenarioDefinition scenarioOutline) {
             if (isScenarioOutline(scenarioOutline) && !hasOutlineSteps()) {
                 int num = 0;
-                outlineIterationsMap.put(scenario.getLocation().getLine(), new ArrayDeque<String>());
+                outlineIterationsMap.put(scenario.getName(), new ArrayDeque<String>());
                 for (Examples example : ((ScenarioOutline) scenarioOutline).getExamples()) {
                     num += example.getTableBody().size();
                 }
                 for (int i = 1; i <= num; i++) {
-                    outlineIterationsMap.get(scenario.getLocation().getLine()).add(" [" + i + "]");
+                    outlineIterationsMap.get(scenario.getName()).add(" [" + i + "]");
                 }
             }
         }
@@ -284,13 +268,13 @@ public class RunningContext {
         }
 
         boolean hasOutlineSteps() {
-            return outlineIterationsMap.get(scenario.getLocation().getLine()) != null &&
-                    !outlineIterationsMap.get(scenario.getLocation().getLine()).isEmpty();
+            return outlineIterationsMap.get(scenario.getName()) != null &&
+                    !outlineIterationsMap.get(scenario.getName()).isEmpty();
         }
 
         String getOutlineIteration() {
             if (hasOutlineSteps()) {
-                return outlineIterationsMap.get(scenario.getLocation().getLine()).poll();
+                return outlineIterationsMap.get(scenario.getName()).poll();
             }
             return null;
         }
