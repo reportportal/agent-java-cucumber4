@@ -146,7 +146,7 @@ public class RunningContext {
 
 
     public static class ScenarioContext {
-        private static Map<String, ArrayDeque<String>> outlineIterationsMap = new HashMap<String, ArrayDeque<String>>();
+        private static Map<String, String> outlineIterationsMap = new HashMap<String, String>();
         private Maybe<String> id = null;
         private Background background;
         private ScenarioDefinition scenario;
@@ -155,6 +155,7 @@ public class RunningContext {
         private Set<String> tags;
         private TestCase testCase;
         private boolean hasBackground = false;
+        private String scenarioDesignation;
 
         ScenarioContext() {
             backgroundSteps = new ArrayDeque<Step>();
@@ -181,14 +182,9 @@ public class RunningContext {
 
         void processScenarioOutline(ScenarioDefinition scenarioOutline) {
             if (isScenarioOutline(scenarioOutline) && !hasOutlineSteps()) {
-                int num = 0;
-                outlineIterationsMap.put(scenario.getName(), new ArrayDeque<String>());
-                for (Examples example : ((ScenarioOutline) scenarioOutline).getExamples()) {
-                    num += example.getTableBody().size();
-                }
-                for (int i = 1; i <= num; i++) {
-                    outlineIterationsMap.get(scenario.getName()).add(" [" + i + "]");
-                }
+                String outlineIdentifyer = " [feature line " +
+                        scenarioDesignation.replaceAll(".*\\.feature:|\\ #.*", "") + "]";
+                outlineIterationsMap.put(scenarioDesignation, outlineIdentifyer);
             }
         }
 
@@ -249,6 +245,7 @@ public class RunningContext {
 
         void setTestCase(TestCase testCase) {
             this.testCase = testCase;
+            scenarioDesignation = testCase.getScenarioDesignation();
         }
 
         void nextBackgroundStep() {
@@ -268,13 +265,13 @@ public class RunningContext {
         }
 
         boolean hasOutlineSteps() {
-            return outlineIterationsMap.get(scenario.getName()) != null &&
-                    !outlineIterationsMap.get(scenario.getName()).isEmpty();
+            return outlineIterationsMap.get(scenarioDesignation) != null &&
+                    !outlineIterationsMap.get(scenarioDesignation).isEmpty();
         }
 
         String getOutlineIteration() {
             if (hasOutlineSteps()) {
-                return outlineIterationsMap.get(scenario.getName()).poll();
+                return outlineIterationsMap.get(scenarioDesignation);
             }
             return null;
         }
