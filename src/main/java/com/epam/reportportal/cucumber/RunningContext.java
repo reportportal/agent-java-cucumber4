@@ -182,7 +182,7 @@ public class RunningContext {
 
         void processScenarioOutline(ScenarioDefinition scenarioOutline) {
             if (isScenarioOutline(scenarioOutline) && !hasOutlineSteps()) {
-                String outlineIdentifyer = " [feature line " +
+                String outlineIdentifyer = " [" +
                         scenarioDesignation.replaceAll(".*\\.feature:|\\ #.*", "") + "]";
                 outlineIterationsMap.put(scenarioDesignation, outlineIdentifyer);
             }
