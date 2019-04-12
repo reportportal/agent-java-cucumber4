@@ -49,7 +49,7 @@ import java.util.Calendar;
 public class ScenarioReporter extends AbstractReporter {
     private static final String SEPARATOR = "-------------------------";
 
-    protected Supplier<Maybe<String>> rootSuiteId;
+    private Supplier<Maybe<String>> rootSuiteId;
 
     @Override
     protected void beforeLaunch() {
@@ -97,7 +97,6 @@ public class ScenarioReporter extends AbstractReporter {
         return "STEP";
     }
 
-
     @Override
     protected Maybe<String> getRootItemId() {
         return rootSuiteId.get();
@@ -112,7 +111,7 @@ public class ScenarioReporter extends AbstractReporter {
     /**
      * Start root suite
      */
-    protected void finishRootItem() {
+    private void finishRootItem() {
         Utils.finishTestItem(launch.get(), rootSuiteId.get());
         rootSuiteId = null;
     }
@@ -120,7 +119,7 @@ public class ScenarioReporter extends AbstractReporter {
     /**
      * Start root suite
      */
-    protected void startRootItem() {
+    private void startRootItem() {
         rootSuiteId = Suppliers.memoize(new Supplier<Maybe<String>>() {
             @Override
             public Maybe<String> get() {

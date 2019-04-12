@@ -45,9 +45,9 @@ import java.util.Calendar;
  * @author Vitaliy Tsvihun
  */
 public class StepReporter extends AbstractReporter {
-    protected Maybe<String> currentStepId;
-    protected Maybe<String> hookStepId;
-    protected String hookStatus;
+    private Maybe<String> currentStepId;
+    private Maybe<String> hookStepId;
+    private String hookStatus;
 
     public StepReporter() {
         super();
