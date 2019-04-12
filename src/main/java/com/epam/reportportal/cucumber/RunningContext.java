@@ -23,11 +23,24 @@ import gherkin.AstBuilder;
 import gherkin.Parser;
 import gherkin.ParserException;
 import gherkin.TokenMatcher;
-import gherkin.ast.*;
+import gherkin.ast.Background;
+import gherkin.ast.Examples;
+import gherkin.ast.Feature;
+import gherkin.ast.GherkinDocument;
+import gherkin.ast.ScenarioDefinition;
+import gherkin.ast.ScenarioOutline;
+import gherkin.ast.Step;
+import gherkin.ast.TableRow;
 import gherkin.pickles.PickleTag;
 import io.reactivex.Maybe;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
 
 
 /**
@@ -37,13 +50,13 @@ import java.util.*;
  * @author Serhii Zharskyi
  * @author Vitaliy Tsvihun
  */
-public class RunningContext {
+class RunningContext {
 
     private RunningContext() {
         throw new AssertionError("No instances should exist for the class!");
     }
 
-    public static class FeatureContext {
+    static class FeatureContext {
         private static Map<String, TestSourceRead> pathToReadEventMap = new HashMap<String, TestSourceRead>();
         private String currentFeatureUri;
         private Maybe<String> currentFeatureId;
@@ -92,11 +105,7 @@ public class RunningContext {
 
         Background getBackground() {
             ScenarioDefinition background = getFeature().getChildren().get(0);
-            if (background instanceof Background) {
-                return (Background) background;
-            } else {
-                return null;
-            }
+            return background instanceof Background ? (Background) background : null;
         }
 
         Feature getFeature() {
@@ -144,8 +153,7 @@ public class RunningContext {
         }
     }
 
-
-    public static class ScenarioContext {
+    static class ScenarioContext {
         private static Map<String, String> outlineIterationsMap = new HashMap<String, String>();
         private Maybe<String> id = null;
         private Background background;
@@ -163,12 +171,11 @@ public class RunningContext {
             tags = new HashSet<String>();
         }
 
-        ScenarioContext processScenario(ScenarioDefinition scenario) {
+        void processScenario(ScenarioDefinition scenario) {
             this.scenario = scenario;
             for (Step step : scenario.getSteps()) {
                 scenarioLocationMap.put(step.getLocation().getLine(), step);
             }
-            return this;
         }
 
         void processBackground(Background background) {
@@ -180,8 +187,11 @@ public class RunningContext {
             }
         }
 
-        void processScenarioOutline(ScenarioDefinition scenarioOutline) {
-            if (isScenarioOutline(scenarioOutline) && !hasOutlineSteps()) {
+        /**
+         * Takes line in feature file for scenario number identification
+         **/
+        void processScenarioOutline(ScenarioDefinition scenarioDefinition) {
+            if (isScenarioOutline(scenarioDefinition) && !hasOutlineSteps()) {
                 String outlineIdentifyer = " [" +
                         scenarioDesignation.replaceAll(".*\\.feature:|\\ #.*", "") + "]";
                 outlineIterationsMap.put(scenarioDesignation, outlineIdentifyer);
@@ -207,10 +217,7 @@ public class RunningContext {
         }
 
         int getLine() {
-            if (isScenarioOutline(scenario)) {
-                return testCase.getLine();
-            }
-            return scenario.getLocation().getLine();
+            return isScenarioOutline(scenario) ? testCase.getLine() : scenario.getLocation().getLine();
         }
 
         Set<String> getTags() {
@@ -270,10 +277,7 @@ public class RunningContext {
         }
 
         String getOutlineIteration() {
-            if (hasOutlineSteps()) {
-                return outlineIterationsMap.get(scenarioDesignation);
-            }
-            return null;
+            return hasOutlineSteps() ? outlineIterationsMap.get(scenarioDesignation) : null;
         }
     }
 }
