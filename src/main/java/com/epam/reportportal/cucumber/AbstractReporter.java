@@ -76,6 +76,9 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
     private Map<Long, RunningContext.ScenarioContext> threadCurrentScenarioContextMap =
             new HashMap<Long, RunningContext.ScenarioContext>();
 
+    // There is no event for recognizing end of feature in Cucumber.
+    // This map is used to record the last scenario time and its feature uri.
+    // End of feature occurs once launch is finished.
     private Map<String, Date> featureEndTime = new HashMap<String, Date>();
 
 
