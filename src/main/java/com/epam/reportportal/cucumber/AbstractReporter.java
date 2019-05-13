@@ -22,9 +22,23 @@ import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
-import cucumber.api.*;
-import cucumber.api.event.*;
-import cucumber.api.formatter.Formatter;
+import cucumber.api.HookTestStep;
+import cucumber.api.HookType;
+import cucumber.api.Result;
+import cucumber.api.TestCase;
+import cucumber.api.TestStep;
+import cucumber.api.event.ConcurrentEventListener;
+import cucumber.api.event.EmbedEvent;
+import cucumber.api.event.EventHandler;
+import cucumber.api.event.EventPublisher;
+import cucumber.api.event.TestCaseFinished;
+import cucumber.api.event.TestCaseStarted;
+import cucumber.api.event.TestRunFinished;
+import cucumber.api.event.TestRunStarted;
+import cucumber.api.event.TestSourceRead;
+import cucumber.api.event.TestStepFinished;
+import cucumber.api.event.TestStepStarted;
+import cucumber.api.event.WriteEvent;
 import io.reactivex.Maybe;
 import org.apache.tika.mime.MimeTypeException;
 import org.apache.tika.mime.MimeTypes;
@@ -44,7 +58,7 @@ import java.util.Date;
  * @author Serhii Zharskyi
  * @author Vitaliy Tsvihun
  */
-public abstract class AbstractReporter implements Formatter {
+public abstract class AbstractReporter implements ConcurrentEventListener {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReporter.class);
 
