@@ -49,6 +49,7 @@ import rp.com.google.common.base.Supplier;
 import rp.com.google.common.base.Suppliers;
 
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -67,19 +68,19 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
     static final String COLON_INFIX = ": ";
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReporter.class);
 
-    private Map<Pair<String, String>, RunningContext.FeatureContext> currentFeatureContextMap =
-            new HashMap<Pair<String, String>, RunningContext.FeatureContext>();
+    private Map<String, RunningContext.FeatureContext> currentFeatureContextMap =
+            Collections.synchronizedMap(new HashMap<String, RunningContext.FeatureContext>());
 
     private Map<Pair<String, String>, RunningContext.ScenarioContext> currentScenarioContextMap =
-            new HashMap<Pair<String, String>, RunningContext.ScenarioContext>();
+            Collections.synchronizedMap(new HashMap<Pair<String, String>, RunningContext.ScenarioContext>());
 
     private Map<Long, RunningContext.ScenarioContext> threadCurrentScenarioContextMap =
-            new HashMap<Long, RunningContext.ScenarioContext>();
+            Collections.synchronizedMap(new HashMap<Long, RunningContext.ScenarioContext>());
 
     // There is no event for recognizing end of feature in Cucumber.
     // This map is used to record the last scenario time and its feature uri.
     // End of feature occurs once launch is finished.
-    private Map<String, Date> featureEndTime = new HashMap<String, Date>();
+    private Map<String, Date> featureEndTime = Collections.synchronizedMap(new HashMap<String, Date>());
 
 
     /**
@@ -164,13 +165,17 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
         }
     }
 
-    private Pair<String, String> getFeatureName(TestCase testCase) {
+    /**
+     * It's essential to operate with feature URI,
+     * to prevent problems with the same feature names in different folders/packages
+     */
+    private String buildFeatureNode(TestCase testCase) {
         RunningContext.FeatureContext featureContext = new RunningContext.FeatureContext()
                 .processTestSourceReadEvent(testCase);
         String featureKeyword = featureContext.getFeature().getKeyword();
         String featureName = featureContext.getFeature().getName();
-        return new Pair<String, String>(featureContext.getUri(),
-                Utils.buildNodeName(featureKeyword, AbstractReporter.COLON_INFIX, featureName, null));
+        Utils.buildNodeName(featureKeyword, AbstractReporter.COLON_INFIX, featureName, null);
+        return featureContext.getUri();
     }
 
     /**
@@ -389,11 +394,11 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 
     private void handleStartOfTestCase(TestCaseStarted event) {
         TestCase testCase = event.testCase;
-        Pair<String, String> featureURIName = getFeatureName(testCase);
-        RunningContext.FeatureContext currentFeatureContext = currentFeatureContextMap.get(featureURIName);
+        String featureURI = buildFeatureNode(testCase);
+        RunningContext.FeatureContext currentFeatureContext = currentFeatureContextMap.get(featureURI);
 
         currentFeatureContext = currentFeatureContext == null ?
-                createFeatureContext(testCase, featureURIName) : currentFeatureContext;
+                createFeatureContext(testCase, featureURI) : currentFeatureContext;
 
         if (!currentFeatureContext.getUri().equals(testCase.getUri())) {
             throw new IllegalStateException("Scenario URI does not match Feature URI.");
@@ -415,15 +420,15 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
         beforeScenario(currentFeatureContext, currentScenarioContext, scenarioName);
     }
 
-    private RunningContext.FeatureContext createFeatureContext(TestCase testCase, Pair<String, String> featureURIName) {
+    private RunningContext.FeatureContext createFeatureContext(TestCase testCase, String featureURI) {
         RunningContext.FeatureContext currentFeatureContext;
         currentFeatureContext = new RunningContext.FeatureContext().processTestSourceReadEvent(testCase);
-        currentFeatureContextMap.put(featureURIName, currentFeatureContext);
+        currentFeatureContextMap.put(featureURI, currentFeatureContext);
 
         StartTestItemRQ rq = new StartTestItemRQ();
         Maybe<String> root = getRootItemId();
         rq.setDescription(currentFeatureContext.getUri());
-        rq.setName(featureURIName.getValue());
+        rq.setName(featureURI.substring(featureURI.lastIndexOf('\\') + 1, featureURI.indexOf(".feature")));
         rq.setTags(currentFeatureContext.getTags());
         rq.setStartTime(Calendar.getInstance().getTime());
         rq.setType(getFeatureTestItemType());

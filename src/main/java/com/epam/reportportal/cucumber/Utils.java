@@ -45,7 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-class Utils {
+public class Utils {
     private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
     private static final String TABLE_SEPARATOR = "|";
     private static final String DOCSTRING_DECORATOR = "\n\"\"\"\n";
