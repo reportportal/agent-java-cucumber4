@@ -45,9 +45,9 @@ import java.util.Calendar;
  * @author Vitaliy Tsvihun
  */
 public class StepReporter extends AbstractReporter {
-    protected Maybe<String> currentStepId;
-    protected Maybe<String> hookStepId;
-    protected String hookStatus;
+    private Maybe<String> currentStepId;
+    private Maybe<String> hookStepId;
+    private String hookStatus;
 
     public StepReporter() {
         super();
@@ -56,7 +56,6 @@ public class StepReporter extends AbstractReporter {
         hookStatus = null;
     }
 
-
     @Override
     protected Maybe<String> getRootItemId() {
         return null;
@@ -64,19 +63,20 @@ public class StepReporter extends AbstractReporter {
 
     @Override
     protected void beforeStep(TestStep testStep) {
+        RunningContext.ScenarioContext currentScenarioContext = getCurrentScenarioContext();
         Step step = currentScenarioContext.getStep(testStep);
         StartTestItemRQ rq = new StartTestItemRQ();
         rq.setName(Utils.buildNodeName(currentScenarioContext.getStepPrefix(), step.getKeyword(), Utils.getStepName(testStep), " "));
         rq.setDescription(Utils.buildMultilineArgument(testStep));
         rq.setStartTime(Calendar.getInstance().getTime());
         rq.setType("STEP");
-        currentStepId = RP.get().startTestItem(currentScenarioContext.getId(), rq);
+        currentStepId = launch.get().startTestItem(currentScenarioContext.getId(), rq);
     }
 
     @Override
     protected void afterStep(Result result) {
         reportResult(result, null);
-        Utils.finishTestItem(RP.get(), currentStepId, result.getStatus().toString().toUpperCase());
+        Utils.finishTestItem(launch.get(), currentStepId, result.getStatus().toString().toUpperCase());
         currentStepId = null;
     }
 
@@ -87,13 +87,13 @@ public class StepReporter extends AbstractReporter {
         rq.setStartTime(Calendar.getInstance().getTime());
         rq.setType(isBefore ? "BEFORE_TEST" : "AFTER_TEST");
 
-        hookStepId = RP.get().startTestItem(currentScenarioContext.getId(), rq);
+        hookStepId = launch.get().startTestItem(getCurrentScenarioContext().getId(), rq);
         hookStatus = Statuses.PASSED;
     }
 
     @Override
     protected void afterHooks(Boolean isBefore) {
-        Utils.finishTestItem(RP.get(), hookStepId, hookStatus);
+        Utils.finishTestItem(launch.get(), hookStepId, hookStatus);
         hookStepId = null;
     }
 

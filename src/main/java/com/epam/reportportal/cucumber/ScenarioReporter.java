@@ -49,7 +49,7 @@ import java.util.Calendar;
 public class ScenarioReporter extends AbstractReporter {
     private static final String SEPARATOR = "-------------------------";
 
-    protected Supplier<Maybe<String>> rootSuiteId;
+    private Supplier<Maybe<String>> rootSuiteId;
 
     @Override
     protected void beforeLaunch() {
@@ -59,8 +59,10 @@ public class ScenarioReporter extends AbstractReporter {
 
     @Override
     protected void beforeStep(TestStep testStep) {
+        RunningContext.ScenarioContext currentScenarioContext = getCurrentScenarioContext();
         Step step = currentScenarioContext.getStep(testStep);
-        String decoratedStepName = decorateMessage(Utils.buildNodeName(currentScenarioContext.getStepPrefix(), step.getKeyword(), Utils.getStepName(testStep), " "));
+        String decoratedStepName = decorateMessage(Utils.buildNodeName(currentScenarioContext.getStepPrefix(),
+                step.getKeyword(), Utils.getStepName(testStep), " "));
         String multilineArg = Utils.buildMultilineArgument(testStep);
         Utils.sendLog(decoratedStepName + multilineArg, "INFO", null);
     }
@@ -95,7 +97,6 @@ public class ScenarioReporter extends AbstractReporter {
         return "STEP";
     }
 
-
     @Override
     protected Maybe<String> getRootItemId() {
         return rootSuiteId.get();
@@ -110,15 +111,15 @@ public class ScenarioReporter extends AbstractReporter {
     /**
      * Start root suite
      */
-    protected void finishRootItem() {
-        Utils.finishTestItem(RP.get(), rootSuiteId.get());
+    private void finishRootItem() {
+        Utils.finishTestItem(launch.get(), rootSuiteId.get());
         rootSuiteId = null;
     }
 
     /**
      * Start root suite
      */
-    protected void startRootItem() {
+    private void startRootItem() {
         rootSuiteId = Suppliers.memoize(new Supplier<Maybe<String>>() {
             @Override
             public Maybe<String> get() {
@@ -126,7 +127,7 @@ public class ScenarioReporter extends AbstractReporter {
                 rq.setName("Root User Story");
                 rq.setStartTime(Calendar.getInstance().getTime());
                 rq.setType("STORY");
-                return RP.get().startTestItem(rq);
+                return launch.get().startTestItem(rq);
             }
         });
     }

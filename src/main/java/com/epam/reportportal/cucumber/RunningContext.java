@@ -42,9 +42,6 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
-import static com.epam.reportportal.cucumber.Utils.extractPickleTags;
-import static com.epam.reportportal.cucumber.Utils.extractTags;
-
 
 /**
  * Running context that contains mostly manipulations with Gherkin objects.
@@ -53,12 +50,14 @@ import static com.epam.reportportal.cucumber.Utils.extractTags;
  * @author Serhii Zharskyi
  * @author Vitaliy Tsvihun
  */
-public class RunningContext {
+class RunningContext {
 
-    public static class FeatureContext {
+    private RunningContext() {
+        throw new AssertionError("No instances should exist for the class!");
+    }
 
+    static class FeatureContext {
         private static Map<String, TestSourceRead> pathToReadEventMap = new HashMap<String, TestSourceRead>();
-
         private String currentFeatureUri;
         private Maybe<String> currentFeatureId;
         private Feature currentFeature;
@@ -83,12 +82,11 @@ public class RunningContext {
             return context;
         }
 
-
         FeatureContext processTestSourceReadEvent(TestCase testCase) {
             TestSourceRead event = pathToReadEventMap.get(testCase.getUri());
             currentFeature = getFeature(event.source);
             currentFeatureUri = event.uri;
-            tags = extractTags(currentFeature.getTags());
+            tags = Utils.extractTags(currentFeature.getTags());
             return this;
         }
 
@@ -107,11 +105,7 @@ public class RunningContext {
 
         Background getBackground() {
             ScenarioDefinition background = getFeature().getChildren().get(0);
-            if (background instanceof Background) {
-                return (Background) background;
-            } else {
-                return null;
-            }
+            return background instanceof Background ? (Background) background : null;
         }
 
         Feature getFeature() {
@@ -134,6 +128,7 @@ public class RunningContext {
             this.currentFeatureId = featureId;
         }
 
+        @SuppressWarnings("unchecked")
         <T extends ScenarioDefinition> T getScenario(TestCase testCase) {
             List<ScenarioDefinition> featureScenarios = getFeature().getChildren();
             for (ScenarioDefinition scenario : featureScenarios) {
@@ -158,11 +153,8 @@ public class RunningContext {
         }
     }
 
-
-    public static class ScenarioContext {
-
-        private static Map<Integer, ArrayDeque<String>> outlineIterationsMap = new HashMap<Integer, ArrayDeque<String>>();
-
+    static class ScenarioContext {
+        private static Map<String, String> outlineIterationsMap = new HashMap<String, String>();
         private Maybe<String> id = null;
         private Background background;
         private ScenarioDefinition scenario;
@@ -171,6 +163,7 @@ public class RunningContext {
         private Set<String> tags;
         private TestCase testCase;
         private boolean hasBackground = false;
+        private String scenarioDesignation;
 
         ScenarioContext() {
             backgroundSteps = new ArrayDeque<Step>();
@@ -178,12 +171,11 @@ public class RunningContext {
             tags = new HashSet<String>();
         }
 
-        ScenarioContext processScenario(ScenarioDefinition scenario) {
+        void processScenario(ScenarioDefinition scenario) {
             this.scenario = scenario;
             for (Step step : scenario.getSteps()) {
                 scenarioLocationMap.put(step.getLocation().getLine(), step);
             }
-            return this;
         }
 
         void processBackground(Background background) {
@@ -195,23 +187,19 @@ public class RunningContext {
             }
         }
 
-        void processScenarioOutline(ScenarioDefinition scenarioOutline) {
-            if (isScenarioOutline(scenarioOutline)) {
-                if (!hasOutlineSteps()) {
-                    int num = 0;
-                    outlineIterationsMap.put(scenario.getLocation().getLine(), new ArrayDeque<String>());
-                    for (Examples example : ((ScenarioOutline) scenarioOutline).getExamples()) {
-                        num += example.getTableBody().size();
-                    }
-                    for (int i = 1; i <= num; i++) {
-                        outlineIterationsMap.get(scenario.getLocation().getLine()).add(" [" + i + "]");
-                    }
-                }
+        /**
+         * Takes line in feature file for scenario number identification
+         **/
+        void processScenarioOutline(ScenarioDefinition scenarioDefinition) {
+            if (isScenarioOutline(scenarioDefinition) && !hasOutlineSteps()) {
+                String outlineIdentifyer = " [" +
+                        scenarioDesignation.replaceAll(".*\\.feature:|\\ #.*", "") + "]";
+                outlineIterationsMap.put(scenarioDesignation, outlineIdentifyer);
             }
         }
 
         void processTags(List<PickleTag> pickleTags) {
-            tags = extractPickleTags(pickleTags);
+            tags = Utils.extractPickleTags(pickleTags);
         }
 
         void mapBackgroundSteps(Background background) {
@@ -229,10 +217,7 @@ public class RunningContext {
         }
 
         int getLine() {
-            if (isScenarioOutline(scenario)) {
-                return testCase.getLine();
-            }
-            return scenario.getLocation().getLine();
+            return isScenarioOutline(scenario) ? testCase.getLine() : scenario.getLocation().getLine();
         }
 
         Set<String> getTags() {
@@ -240,11 +225,8 @@ public class RunningContext {
         }
 
         String getStepPrefix() {
-            if (hasBackground() && withBackground()) {
-                return background.getKeyword().toUpperCase() + AbstractReporter.COLON_INFIX;
-            } else {
-                return "";
-            }
+            return hasBackground() && withBackground() ?
+                    background.getKeyword().toUpperCase() + AbstractReporter.COLON_INFIX : "";
         }
 
         Step getStep(TestStep testStep) {
@@ -253,7 +235,8 @@ public class RunningContext {
             if (step != null) {
                 return step;
             }
-            throw new IllegalStateException(String.format("Trying to get step for unknown line in feature. Scenario: %s, line: %s", scenario.getName(), getLine()));
+            throw new IllegalStateException(String.format("Trying to get step for unknown line in feature. " +
+                    "Scenario: %s, line: %s", scenario.getName(), getLine()));
         }
 
         Maybe<String> getId() {
@@ -269,6 +252,7 @@ public class RunningContext {
 
         void setTestCase(TestCase testCase) {
             this.testCase = testCase;
+            scenarioDesignation = testCase.getScenarioDesignation();
         }
 
         void nextBackgroundStep() {
@@ -276,10 +260,7 @@ public class RunningContext {
         }
 
         boolean isScenarioOutline(ScenarioDefinition scenario) {
-            if (scenario != null) {
-                return scenario instanceof ScenarioOutline;
-            }
-            return false;
+            return scenario instanceof ScenarioOutline;
         }
 
         boolean withBackground() {
@@ -291,14 +272,12 @@ public class RunningContext {
         }
 
         boolean hasOutlineSteps() {
-            return outlineIterationsMap.get(scenario.getLocation().getLine()) != null && !outlineIterationsMap.get(scenario.getLocation().getLine()).isEmpty();
+            return outlineIterationsMap.get(scenarioDesignation) != null &&
+                    !outlineIterationsMap.get(scenarioDesignation).isEmpty();
         }
 
         String getOutlineIteration() {
-            if (hasOutlineSteps()) {
-                return outlineIterationsMap.get(scenario.getLocation().getLine()).poll();
-            }
-            return null;
+            return hasOutlineSteps() ? outlineIterationsMap.get(scenarioDesignation) : null;
         }
     }
 }
