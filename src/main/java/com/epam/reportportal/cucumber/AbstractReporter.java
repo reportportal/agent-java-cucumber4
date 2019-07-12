@@ -19,8 +19,8 @@ import com.epam.reportportal.listeners.ListenerParameters;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
-import com.epam.ta.reportportal.ws.model.ItemAttributeResource;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
+import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
 import cucumber.api.*;
@@ -126,7 +126,7 @@ public abstract class AbstractReporter implements Formatter {
 	 * Start Cucumber scenario
 	 */
 	protected void beforeScenario() {
-		Maybe<Long> id = Utils.startNonLeafNode(
+		Maybe<String> id = Utils.startNonLeafNode(
 				RP.get(),
 				currentFeatureContext.getFeatureId(),
 				Utils.buildNodeName(currentScenarioContext.getKeyword(),
@@ -154,7 +154,7 @@ public abstract class AbstractReporter implements Formatter {
 	 */
 	protected void startFeature() {
 		StartTestItemRQ rq = new StartTestItemRQ();
-		Maybe<Long> root = getRootItemId();
+		Maybe<String> root = getRootItemId();
 		rq.setDescription(currentFeatureContext.getUri());
 		rq.setName(Utils.buildNodeName(
 				currentFeatureContext.getFeature().getKeyword(),
@@ -190,18 +190,17 @@ public abstract class AbstractReporter implements Formatter {
 				rq.setName(parameters.getLaunchName());
 				rq.setStartTime(startTime);
 				rq.setMode(parameters.getLaunchRunningMode());
-				rq.setAttributes(parameters.getAttributes() == null ? new HashSet<ItemAttributeResource>() : parameters.getAttributes());
+				rq.setAttributes(parameters.getAttributes() == null ? new HashSet<ItemAttributesRQ>() : parameters.getAttributes());
 				rq.setDescription(parameters.getDescription());
 
-				final Boolean skippedAnIssue = parameters.getSkippedAnIssue();
-				final ItemAttributeResource skippedIssueAttr = new ItemAttributeResource();
+				Boolean skippedAnIssue = parameters.getSkippedAnIssue();
+				ItemAttributesRQ skippedIssueAttr = new ItemAttributesRQ();
 				skippedIssueAttr.setKey(SKIPPED_ISSUE_KEY);
 				skippedIssueAttr.setValue(skippedAnIssue == null ? "true" : skippedAnIssue.toString());
 				skippedIssueAttr.setSystem(true);
 				rq.getAttributes().add(skippedIssueAttr);
 
-				Launch launch = reportPortal.newLaunch(rq);
-				return launch;
+				return reportPortal.newLaunch(rq);
 			}
 		});
 	}
@@ -297,7 +296,7 @@ public abstract class AbstractReporter implements Formatter {
 		return HookType.Before == ((HookTestStep) step).getHookType();
 	}
 
-	protected abstract Maybe<Long> getRootItemId();
+	protected abstract Maybe<String> getRootItemId();
 
 	/**
 	 * Private part that responsible for handling events
