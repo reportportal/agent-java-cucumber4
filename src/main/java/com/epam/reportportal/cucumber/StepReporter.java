@@ -17,6 +17,7 @@ package com.epam.reportportal.cucumber;
 
 import com.epam.reportportal.listeners.Statuses;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
+import cucumber.api.PickleStepTestStep;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
 import gherkin.ast.Step;
@@ -47,7 +48,7 @@ import java.util.Calendar;
  */
 public class StepReporter extends AbstractReporter {
 
-    public static final String METHOD_BRACKET = "(";
+    public static final String METHOD_OPENING_BRACKET= "(";
 
     protected Maybe<String> currentStepId;
     protected Maybe<String> hookStepId;
@@ -74,7 +75,8 @@ public class StepReporter extends AbstractReporter {
         rq.setDescription(Utils.buildMultilineArgument(testStep));
         rq.setStartTime(Calendar.getInstance().getTime());
         rq.setType("STEP");
-        rq.setLocation(StringUtils.substringBefore(testStep.getCodeLocation(), METHOD_BRACKET));
+		String codeLocation = testStep.getCodeLocation();
+		rq.setLocation(codeLocation.substring(0, codeLocation.indexOf(METHOD_OPENING_BRACKET)));
         currentStepId = RP.get().startTestItem(currentScenarioContext.getId(), rq);
     }
 
