@@ -15,7 +15,7 @@
  */
 package com.epam.reportportal.cucumber;
 
-import com.epam.ta.reportportal.ws.model.ItemAttributeResource;
+import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import cucumber.api.PickleStepTestStep;
 import cucumber.api.TestCase;
 import cucumber.api.TestStep;
@@ -30,8 +30,8 @@ import io.reactivex.Maybe;
 
 import java.util.*;
 
+import static com.epam.reportportal.cucumber.Utils.extractAttributes;
 import static com.epam.reportportal.cucumber.Utils.extractPickleTags;
-import static com.epam.reportportal.cucumber.Utils.extractTags;
 
 /**
  * Running context that contains mostly manipulations with Gherkin objects.
@@ -47,12 +47,12 @@ public class RunningContext {
 		private static Map<String, TestSourceRead> pathToReadEventMap = new HashMap<String, TestSourceRead>();
 
 		private String currentFeatureUri;
-		private Maybe<Long> currentFeatureId;
+		private Maybe<String> currentFeatureId;
 		private Feature currentFeature;
-		private Set<ItemAttributeResource> tags;
+		private Set<ItemAttributesRQ> tags;
 
 		FeatureContext() {
-			tags = new HashSet<ItemAttributeResource>();
+			tags = new HashSet<ItemAttributesRQ>();
 		}
 
 		static void addTestSourceReadEvent(String path, TestSourceRead event) {
@@ -74,7 +74,7 @@ public class RunningContext {
 			TestSourceRead event = pathToReadEventMap.get(testCase.getUri());
 			currentFeature = getFeature(event.source);
 			currentFeatureUri = event.uri;
-			tags = extractTags(currentFeature.getTags());
+			tags = extractAttributes(currentFeature.getTags());
 			return this;
 		}
 
@@ -104,7 +104,7 @@ public class RunningContext {
 			return currentFeature;
 		}
 
-		Set<ItemAttributeResource> getTags() {
+		Set<ItemAttributesRQ> getTags() {
 			return tags;
 		}
 
@@ -112,11 +112,11 @@ public class RunningContext {
 			return currentFeatureUri;
 		}
 
-		Maybe<Long> getFeatureId() {
+		Maybe<String> getFeatureId() {
 			return currentFeatureId;
 		}
 
-		void setFeatureId(Maybe<Long> featureId) {
+		void setFeatureId(Maybe<String> featureId) {
 			this.currentFeatureId = featureId;
 		}
 
@@ -148,19 +148,19 @@ public class RunningContext {
 
 		private static Map<Integer, ArrayDeque<String>> outlineIterationsMap = new HashMap<Integer, ArrayDeque<String>>();
 
-		private Maybe<Long> id = null;
+		private Maybe<String> id = null;
 		private Background background;
 		private ScenarioDefinition scenario;
 		private Queue<Step> backgroundSteps;
 		private Map<Integer, Step> scenarioLocationMap;
-		private Set<ItemAttributeResource> attributes;
+		private Set<ItemAttributesRQ> attributes;
 		private TestCase testCase;
 		private boolean hasBackground = false;
 
 		ScenarioContext() {
 			backgroundSteps = new ArrayDeque<Step>();
 			scenarioLocationMap = new HashMap<Integer, Step>();
-			attributes = new HashSet<ItemAttributeResource>();
+			attributes = new HashSet<ItemAttributesRQ>();
 		}
 
 		ScenarioContext processScenario(ScenarioDefinition scenario) {
@@ -220,7 +220,7 @@ public class RunningContext {
 			return scenario.getLocation().getLine();
 		}
 
-		Set<ItemAttributeResource> getAttributes() {
+		Set<ItemAttributesRQ> getAttributes() {
 			return attributes;
 		}
 
@@ -244,11 +244,11 @@ public class RunningContext {
 			));
 		}
 
-		Maybe<Long> getId() {
+		Maybe<String> getId() {
 			return id;
 		}
 
-		void setId(Maybe<Long> newId) {
+		void setId(Maybe<String> newId) {
 			if (id != null) {
 				throw new IllegalStateException("Attempting re-set scenario ID for unfinished scenario.");
 			}
