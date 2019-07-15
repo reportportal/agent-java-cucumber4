@@ -21,6 +21,7 @@ import cucumber.api.Result;
 import cucumber.api.TestStep;
 import gherkin.ast.Step;
 import io.reactivex.Maybe;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.Calendar;
 
@@ -45,6 +46,9 @@ import java.util.Calendar;
  * @author Vitaliy Tsvihun
  */
 public class StepReporter extends AbstractReporter {
+
+    public static final String METHOD_BRACKET = "(";
+
     protected Maybe<String> currentStepId;
     protected Maybe<String> hookStepId;
     protected String hookStatus;
@@ -70,7 +74,7 @@ public class StepReporter extends AbstractReporter {
         rq.setDescription(Utils.buildMultilineArgument(testStep));
         rq.setStartTime(Calendar.getInstance().getTime());
         rq.setType("STEP");
-        rq.setLocation(testStep.getCodeLocation());
+        rq.setLocation(StringUtils.substringBefore(testStep.getCodeLocation(), METHOD_BRACKET));
         currentStepId = RP.get().startTestItem(currentScenarioContext.getId(), rq);
     }
 
