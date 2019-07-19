@@ -47,8 +47,18 @@ import java.util.Set;
 
 public class Utils {
     private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
+    private static final String TABLE_INDENT = "          ";
     private static final String TABLE_SEPARATOR = "|";
     private static final String DOCSTRING_DECORATOR = "\n\"\"\"\n";
+    private static final String PASSED = "passed";
+    private static final String SKIPPED = "skipped";
+    private static final String INFO = "INFO";
+    private static final String WARN = "WARN";
+    private static final String ERROR = "ERROR";
+    private static final String EMPTY = "";
+    private static final String ONE_SPACE = " ";
+    private static final String HOOK_ = "Hook: ";
+    private static final String NEW_LINE = "\r\n";
 
     private Utils() {
         throw new AssertionError("No instances should exist for the class!");
@@ -56,8 +66,8 @@ public class Utils {
 
     //@formatter:off
     private static final Map<String, String> STATUS_MAPPING = ImmutableMap.<String, String>builder()
-            .put("passed", Statuses.PASSED)
-            .put("skipped", Statuses.SKIPPED)
+            .put(PASSED, Statuses.PASSED)
+            .put(SKIPPED, Statuses.SKIPPED)
             //TODO replace with NOT_IMPLEMENTED in future
             .put("undefined", Statuses.SKIPPED).build();
     //@formatter:on
@@ -154,12 +164,12 @@ public class Utils {
      */
     static String mapLevel(String cukesStatus) {
         String mapped;
-        if (cukesStatus.equalsIgnoreCase("passed")) {
-            mapped = "INFO";
-        } else if (cukesStatus.equalsIgnoreCase("skipped")) {
-            mapped = "WARN";
+        if (cukesStatus.equalsIgnoreCase(PASSED)) {
+            mapped = INFO;
+        } else if (cukesStatus.equalsIgnoreCase(SKIPPED)) {
+            mapped = WARN;
         } else {
-            mapped = "ERROR";
+            mapped = ERROR;
         }
         return mapped;
     }
@@ -179,7 +189,7 @@ public class Utils {
     }
 
     private static String buildName(String prefix, String infix, String argument, String suffix) {
-        return (prefix == null ? "" : prefix) + infix + argument + (suffix == null ? "" : suffix);
+        return (prefix == null ? EMPTY : prefix) + infix + argument + (suffix == null ? EMPTY : suffix);
     }
 
     /**
@@ -191,7 +201,7 @@ public class Utils {
      */
     static String buildMultilineArgument(TestStep step) {
         List<PickleRow> table = null;
-        String dockString = "";
+        String dockString = EMPTY;
         StringBuilder marg = new StringBuilder();
         PickleStepTestStep pickleStep = (PickleStepTestStep) step;
         if (!pickleStep.getStepArgument().isEmpty()) {
@@ -203,13 +213,13 @@ public class Utils {
             }
         }
         if (table != null) {
-            marg.append("\r\n");
+            marg.append(NEW_LINE);
             for (PickleRow row : table) {
-                marg.append(TABLE_SEPARATOR);
+                marg.append(TABLE_INDENT).append(TABLE_SEPARATOR);
                 for (PickleCell cell : row.getCells()) {
-                    marg.append(" ").append(cell.getValue()).append(" ").append(TABLE_SEPARATOR);
+                    marg.append(ONE_SPACE).append(cell.getValue()).append(ONE_SPACE).append(TABLE_SEPARATOR);
                 }
-                marg.append("\r\n");
+                marg.append(NEW_LINE);
             }
         }
 
@@ -220,7 +230,7 @@ public class Utils {
     }
 
     static String getStepName(TestStep step) {
-        return step instanceof HookTestStep ? "Hook: " + ((HookTestStep) step).getHookType().toString() :
+        return step instanceof HookTestStep ? HOOK_ + ((HookTestStep) step).getHookType().toString() :
                 ((PickleStepTestStep) step).getPickleStep().getText();
     }
 }

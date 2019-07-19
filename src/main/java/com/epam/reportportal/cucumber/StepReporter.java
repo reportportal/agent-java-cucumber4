@@ -17,6 +17,7 @@ package com.epam.reportportal.cucumber;
 
 import com.epam.reportportal.listeners.Statuses;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
+import cucumber.api.HookTestStep;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
 import gherkin.ast.Step;
@@ -98,7 +99,7 @@ public class StepReporter extends AbstractReporter {
     }
 
     @Override
-    protected void hookFinished(TestStep step, Result result, Boolean isBefore) {
+    protected void hookFinished(HookTestStep step, Result result, Boolean isBefore) {
         reportResult(result, (isBefore ? "Before" : "After") + " hook: " + step.getCodeLocation());
         hookStatus = result.getStatus().toString();
     }

@@ -239,7 +239,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
      * @param result   Hook result
      * @param isBefore - if true, before-hook, if false - after-hook
      */
-    protected abstract void hookFinished(TestStep step, Result result, Boolean isBefore);
+    protected abstract void hookFinished(HookTestStep step, Result result, Boolean isBefore);
 
     /**
      * Return RP launch test item name mapped to Cucumber feature
@@ -451,7 +451,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 
     private void handleTestStepFinished(TestStepFinished event) {
         if (event.testStep instanceof HookTestStep) {
-            hookFinished(event.testStep, event.result, isBefore(event.testStep));
+            hookFinished((HookTestStep) event.testStep, event.result, isBefore(event.testStep));
             afterHooks(isBefore(event.testStep));
         } else {
             afterStep(event.result);
