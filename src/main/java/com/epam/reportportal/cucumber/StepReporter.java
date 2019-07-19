@@ -110,6 +110,6 @@ public class StepReporter extends AbstractReporter {
 
     @Override
     protected String getScenarioTestItemType() {
-        return "SCENARIO";
+        return "TEST";
     }
 }
