@@ -17,12 +17,10 @@ package com.epam.reportportal.cucumber;
 
 import com.epam.reportportal.listeners.Statuses;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
-import cucumber.api.PickleStepTestStep;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
 import gherkin.ast.Step;
 import io.reactivex.Maybe;
-import org.apache.commons.lang3.StringUtils;
 
 import java.util.Calendar;
 
