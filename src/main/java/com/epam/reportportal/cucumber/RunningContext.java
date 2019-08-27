@@ -15,6 +15,7 @@
  */
 package com.epam.reportportal.cucumber;
 
+import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import cucumber.api.PickleStepTestStep;
 import cucumber.api.TestCase;
 import cucumber.api.TestStep;
@@ -23,25 +24,11 @@ import gherkin.AstBuilder;
 import gherkin.Parser;
 import gherkin.ParserException;
 import gherkin.TokenMatcher;
-import gherkin.ast.Background;
-import gherkin.ast.Examples;
-import gherkin.ast.Feature;
-import gherkin.ast.GherkinDocument;
-import gherkin.ast.ScenarioDefinition;
-import gherkin.ast.ScenarioOutline;
-import gherkin.ast.Step;
-import gherkin.ast.TableRow;
+import gherkin.ast.*;
 import gherkin.pickles.PickleTag;
 import io.reactivex.Maybe;
 
-import java.util.ArrayDeque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
-
+import java.util.*;
 
 /**
  * Running context that contains mostly manipulations with Gherkin objects.
@@ -61,10 +48,10 @@ class RunningContext {
         private String currentFeatureUri;
         private Maybe<String> currentFeatureId;
         private Feature currentFeature;
-        private Set<String> tags;
+        private Set<ItemAttributesRQ> attributes;
 
         FeatureContext() {
-            tags = new HashSet<String>();
+            attributes = new HashSet<ItemAttributesRQ>();
         }
 
         static void addTestSourceReadEvent(String path, TestSourceRead event) {
@@ -86,7 +73,7 @@ class RunningContext {
             TestSourceRead event = pathToReadEventMap.get(testCase.getUri());
             currentFeature = getFeature(event.source);
             currentFeatureUri = event.uri;
-            tags = Utils.extractTags(currentFeature.getTags());
+            attributes = Utils.extractAttributes(currentFeature.getTags());
             return this;
         }
 
@@ -112,8 +99,8 @@ class RunningContext {
             return currentFeature;
         }
 
-        Set<String> getTags() {
-            return tags;
+        Set<ItemAttributesRQ> getAttributes() {
+            return attributes;
         }
 
         String getUri() {
@@ -160,7 +147,7 @@ class RunningContext {
         private ScenarioDefinition scenario;
         private Queue<Step> backgroundSteps;
         private Map<Integer, Step> scenarioLocationMap;
-        private Set<String> tags;
+        private Set<ItemAttributesRQ> attributes;
         private TestCase testCase;
         private boolean hasBackground = false;
         private String scenarioDesignation;
@@ -168,7 +155,7 @@ class RunningContext {
         ScenarioContext() {
             backgroundSteps = new ArrayDeque<Step>();
             scenarioLocationMap = new HashMap<Integer, Step>();
-            tags = new HashSet<String>();
+            attributes = new HashSet<ItemAttributesRQ>();
         }
 
         void processScenario(ScenarioDefinition scenario) {
@@ -187,19 +174,22 @@ class RunningContext {
             }
         }
 
+        public Set<ItemAttributesRQ> getAttributes() {
+            return attributes;
+        }
+
         /**
          * Takes line in feature file for scenario number identification
          **/
         void processScenarioOutline(ScenarioDefinition scenarioDefinition) {
             if (isScenarioOutline(scenarioDefinition) && !hasOutlineSteps()) {
-                String outlineIdentifyer = " [" +
-                        scenarioDesignation.replaceAll(".*\\.feature:|\\ #.*", "") + "]";
+                String outlineIdentifyer = " [" + scenarioDesignation.replaceAll(".*\\.feature:|\\ #.*", "") + "]";
                 outlineIterationsMap.put(scenarioDesignation, outlineIdentifyer);
             }
         }
 
         void processTags(List<PickleTag> pickleTags) {
-            tags = Utils.extractPickleTags(pickleTags);
+            attributes = Utils.extractPickleTags(pickleTags);
         }
 
         void mapBackgroundSteps(Background background) {
@@ -220,13 +210,8 @@ class RunningContext {
             return isScenarioOutline(scenario) ? testCase.getLine() : scenario.getLocation().getLine();
         }
 
-        Set<String> getTags() {
-            return tags;
-        }
-
         String getStepPrefix() {
-            return hasBackground() && withBackground() ?
-                    background.getKeyword().toUpperCase() + AbstractReporter.COLON_INFIX : "";
+            return hasBackground() && withBackground() ? background.getKeyword().toUpperCase() + AbstractReporter.COLON_INFIX : "";
         }
 
         Step getStep(TestStep testStep) {
@@ -235,8 +220,10 @@ class RunningContext {
             if (step != null) {
                 return step;
             }
-            throw new IllegalStateException(String.format("Trying to get step for unknown line in feature. " +
-                    "Scenario: %s, line: %s", scenario.getName(), getLine()));
+            throw new IllegalStateException(String.format("Trying to get step for unknown line in feature. " + "Scenario: %s, line: %s",
+                    scenario.getName(),
+                    getLine()
+            ));
         }
 
         Maybe<String> getId() {
@@ -272,8 +259,7 @@ class RunningContext {
         }
 
         boolean hasOutlineSteps() {
-            return outlineIterationsMap.get(scenarioDesignation) != null &&
-                    !outlineIterationsMap.get(scenarioDesignation).isEmpty();
+            return outlineIterationsMap.get(scenarioDesignation) != null && !outlineIterationsMap.get(scenarioDesignation).isEmpty();
         }
 
         String getOutlineIteration() {

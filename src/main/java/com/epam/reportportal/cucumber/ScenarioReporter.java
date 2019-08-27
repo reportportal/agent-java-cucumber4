@@ -75,7 +75,10 @@ public class ScenarioReporter extends AbstractReporter {
         Step step = currentScenarioContext.getStep(testStep);
         int lineInFeaturefile = step.getLocation().getLine();
         String decoratedStepName = lineInFeaturefile + decorateMessage(Utils.buildNodeName(currentScenarioContext.getStepPrefix(),
-                step.getKeyword(), Utils.getStepName(testStep), EMPTY_SUFFIX));
+                step.getKeyword(),
+                Utils.getStepName(testStep),
+                EMPTY_SUFFIX
+        ));
         String multilineArg = Utils.buildMultilineArgument(testStep);
         Utils.sendLog(decoratedStepName + multilineArg, INFO, null);
     }
