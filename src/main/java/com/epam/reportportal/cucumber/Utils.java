@@ -20,30 +20,25 @@ import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
+import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
 import cucumber.api.HookTestStep;
 import cucumber.api.PickleStepTestStep;
 import cucumber.api.TestStep;
+import cucumber.runtime.StepDefinitionMatch;
 import gherkin.ast.Tag;
-import gherkin.pickles.Argument;
-import gherkin.pickles.PickleCell;
-import gherkin.pickles.PickleRow;
-import gherkin.pickles.PickleString;
-import gherkin.pickles.PickleTable;
-import gherkin.pickles.PickleTag;
+import gherkin.pickles.*;
 import io.reactivex.Maybe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rp.com.google.common.base.Function;
 import rp.com.google.common.collect.ImmutableMap;
 
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.*;
 
 public class Utils {
     private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
@@ -59,6 +54,11 @@ public class Utils {
     private static final String ONE_SPACE = " ";
     private static final String HOOK_ = "Hook: ";
     private static final String NEW_LINE = "\r\n";
+
+    private static final String DEFINITION_MATCH_FIELD_NAME = "definitionMatch";
+    private static final String STEP_DEFINITION_FIELD_NAME = "stepDefinition";
+    private static final String GET_LOCATION_METHOD_NAME = "getLocation";
+    private static final String METHOD_OPENING_BRACKET = "(";
 
     private Utils() {
         throw new AssertionError("No instances should exist for the class!");
@@ -100,11 +100,11 @@ public class Utils {
     }
 
     static Maybe<String> startNonLeafNode(Launch rp, Maybe<String> rootItemId, String name, String description,
-                                          Set<String> tags, String type) {
+            Set<ItemAttributesRQ> attributes, String type) {
         StartTestItemRQ rq = new StartTestItemRQ();
         rq.setDescription(description);
         rq.setName(name);
-        rq.setTags(tags);
+        rq.setAttributes(attributes);
         rq.setStartTime(Calendar.getInstance().getTime());
         rq.setType(type);
         return rp.startTestItem(rootItemId, rq);
@@ -113,10 +113,10 @@ public class Utils {
     static void sendLog(final String message, final String level, final File file) {
         ReportPortal.emitLog(new Function<String, SaveLogRQ>() {
             @Override
-            public SaveLogRQ apply(String item) {
+            public SaveLogRQ apply(String itemUuid) {
                 SaveLogRQ rq = new SaveLogRQ();
                 rq.setMessage(message);
-                rq.setTestItemId(item);
+                rq.setItemUuid(itemUuid);
                 rq.setLevel(level);
                 rq.setLogTime(Calendar.getInstance().getTime());
                 if (file != null) {
@@ -127,19 +127,18 @@ public class Utils {
         });
     }
 
-
     /**
      * Transform tags from Cucumber to RP format
      *
      * @param tags - Cucumber tags
      * @return set of tags
      */
-    static Set<String> extractPickleTags(List<PickleTag> tags) {
-        Set<String> returnTags = new HashSet<String>();
+    static Set<ItemAttributesRQ> extractPickleTags(List<PickleTag> tags) {
+        Set<ItemAttributesRQ> attributes = new HashSet<ItemAttributesRQ>();
         for (PickleTag tag : tags) {
-            returnTags.add(tag.getName());
+            attributes.add(new ItemAttributesRQ(null, tag.getName()));
         }
-        return returnTags;
+        return attributes;
     }
 
     /**
@@ -148,12 +147,12 @@ public class Utils {
      * @param tags - Cucumber tags
      * @return set of tags
      */
-    static Set<String> extractTags(List<Tag> tags) {
-        Set<String> returnTags = new HashSet<String>();
+    public static Set<ItemAttributesRQ> extractAttributes(List<Tag> tags) {
+        Set<ItemAttributesRQ> attributes = new HashSet<ItemAttributesRQ>();
         for (Tag tag : tags) {
-            returnTags.add(tag.getName());
+            attributes.add(new ItemAttributesRQ(null, tag.getName()));
         }
-        return returnTags;
+        return attributes;
     }
 
     /**
@@ -230,7 +229,61 @@ public class Utils {
     }
 
     static String getStepName(TestStep step) {
-        return step instanceof HookTestStep ? HOOK_ + ((HookTestStep) step).getHookType().toString() :
+        return step instanceof HookTestStep ?
+                HOOK_ + ((HookTestStep) step).getHookType().toString() :
                 ((PickleStepTestStep) step).getPickleStep().getText();
+    }
+
+    public static String getCodeRef(TestStep testStep) {
+
+        Field definitionMatchField = getDefinitionMatchField(testStep);
+
+        if (definitionMatchField != null) {
+
+            try {
+                StepDefinitionMatch stepDefinitionMatch = (StepDefinitionMatch) definitionMatchField.get(testStep);
+                Field stepDefinitionField = stepDefinitionMatch.getClass().getDeclaredField(STEP_DEFINITION_FIELD_NAME);
+                stepDefinitionField.setAccessible(true);
+                Object javaStepDefinition = stepDefinitionField.get(stepDefinitionMatch);
+                Method getLocationMethod = javaStepDefinition.getClass().getDeclaredMethod(GET_LOCATION_METHOD_NAME, boolean.class);
+                getLocationMethod.setAccessible(true);
+                String fullCodeRef = String.valueOf(getLocationMethod.invoke(javaStepDefinition, true));
+                return fullCodeRef != null ? fullCodeRef.substring(0, fullCodeRef.indexOf(METHOD_OPENING_BRACKET)) : null;
+            } catch (NoSuchFieldException e) {
+                return null;
+            } catch (NoSuchMethodException e) {
+                return null;
+            } catch (IllegalAccessException e) {
+                return null;
+            } catch (InvocationTargetException e) {
+                return null;
+            }
+
+        } else {
+            return null;
+        }
+
+    }
+
+    private static Field getDefinitionMatchField(TestStep testStep) {
+
+        Class<?> clazz = testStep.getClass();
+
+        try {
+            return clazz.getField(DEFINITION_MATCH_FIELD_NAME);
+        } catch (NoSuchFieldException e) {
+            do {
+                try {
+                    Field definitionMatchField = clazz.getDeclaredField(DEFINITION_MATCH_FIELD_NAME);
+                    definitionMatchField.setAccessible(true);
+                    return definitionMatchField;
+                } catch (NoSuchFieldException ignore) {
+                }
+
+                clazz = clazz.getSuperclass();
+            } while (clazz != null);
+
+            return null;
+        }
     }
 }

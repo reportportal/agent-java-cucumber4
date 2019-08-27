@@ -20,25 +20,11 @@ import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
+import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
-import cucumber.api.HookTestStep;
-import cucumber.api.HookType;
-import cucumber.api.Result;
-import cucumber.api.TestCase;
-import cucumber.api.TestStep;
-import cucumber.api.event.ConcurrentEventListener;
-import cucumber.api.event.EmbedEvent;
-import cucumber.api.event.EventHandler;
-import cucumber.api.event.EventPublisher;
-import cucumber.api.event.TestCaseFinished;
-import cucumber.api.event.TestCaseStarted;
-import cucumber.api.event.TestRunFinished;
-import cucumber.api.event.TestRunStarted;
-import cucumber.api.event.TestSourceRead;
-import cucumber.api.event.TestStepFinished;
-import cucumber.api.event.TestStepStarted;
-import cucumber.api.event.WriteEvent;
+import cucumber.api.*;
+import cucumber.api.event.*;
 import io.reactivex.Maybe;
 import javafx.util.Pair;
 import org.apache.tika.mime.MimeTypeException;
@@ -48,11 +34,9 @@ import org.slf4j.LoggerFactory;
 import rp.com.google.common.base.Supplier;
 import rp.com.google.common.base.Suppliers;
 
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+
+import static rp.com.google.common.base.Strings.isNullOrEmpty;
 
 /**
  * Abstract Cucumber 4.x formatter for Report Portal
@@ -66,22 +50,19 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 
     Supplier<Launch> launch;
     static final String COLON_INFIX = ": ";
+    private static final String SKIPPED_ISSUE_KEY = "skippedIssue";
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReporter.class);
 
-    private Map<String, RunningContext.FeatureContext> currentFeatureContextMap =
-            Collections.synchronizedMap(new HashMap<String, RunningContext.FeatureContext>());
+    private Map<String, RunningContext.FeatureContext> currentFeatureContextMap = Collections.synchronizedMap(new HashMap<String, RunningContext.FeatureContext>());
 
-    private Map<Pair<String, String>, RunningContext.ScenarioContext> currentScenarioContextMap =
-            Collections.synchronizedMap(new HashMap<Pair<String, String>, RunningContext.ScenarioContext>());
+    private Map<Pair<String, String>, RunningContext.ScenarioContext> currentScenarioContextMap = Collections.synchronizedMap(new HashMap<Pair<String, String>, RunningContext.ScenarioContext>());
 
-    private Map<Long, RunningContext.ScenarioContext> threadCurrentScenarioContextMap =
-            Collections.synchronizedMap(new HashMap<Long, RunningContext.ScenarioContext>());
+    private Map<Long, RunningContext.ScenarioContext> threadCurrentScenarioContextMap = Collections.synchronizedMap(new HashMap<Long, RunningContext.ScenarioContext>());
 
     // There is no event for recognizing end of feature in Cucumber.
     // This map is used to record the last scenario time and its feature uri.
     // End of feature occurs once launch is finished.
     private Map<String, Date> featureEndTime = Collections.synchronizedMap(new HashMap<String, Date>());
-
 
     /**
      * Registers an event handler for a specific event.
@@ -135,15 +116,16 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
     /**
      * Start Cucumber scenario
      */
-    private void beforeScenario(RunningContext.FeatureContext currentFeatureContext,
-                                RunningContext.ScenarioContext currentScenarioContext, String scenarioName) {
+    private void beforeScenario(RunningContext.FeatureContext currentFeatureContext, RunningContext.ScenarioContext currentScenarioContext,
+            String scenarioName) {
         Maybe<String> id = Utils.startNonLeafNode(
                 launch.get(),
                 currentFeatureContext.getFeatureId(),
                 scenarioName,
                 currentFeatureContext.getUri() + ":" + currentScenarioContext.getLine(),
-                currentScenarioContext.getTags(),
-                getScenarioTestItemType());
+                currentScenarioContext.getAttributes(),
+                getScenarioTestItemType()
+        );
         currentScenarioContext.setId(id);
     }
 
@@ -156,8 +138,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
         for (Map.Entry<Pair<String, String>, RunningContext.ScenarioContext> scenarioContext : currentScenarioContextMap.entrySet()) {
             if (scenarioContext.getValue().getLine() == currentScenarioContext.getLine()) {
                 currentScenarioContextMap.remove(scenarioContext.getKey());
-                Date endTime = Utils.finishTestItem(launch.get(), currentScenarioContext.getId(),
-                        event.result.getStatus().toString());
+                Date endTime = Utils.finishTestItem(launch.get(), currentScenarioContext.getId(), event.result.getStatus().toString());
                 String featureURI = scenarioContext.getKey().getValue();
                 featureEndTime.put(featureURI, endTime);
                 break;
@@ -170,8 +151,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
      * to prevent problems with the same feature names in different folders/packages
      */
     private String buildFeatureNode(TestCase testCase) {
-        RunningContext.FeatureContext featureContext = new RunningContext.FeatureContext()
-                .processTestSourceReadEvent(testCase);
+        RunningContext.FeatureContext featureContext = new RunningContext.FeatureContext().processTestSourceReadEvent(testCase);
         String featureKeyword = featureContext.getFeature().getKeyword();
         String featureName = featureContext.getFeature().getName();
         Utils.buildNodeName(featureKeyword, AbstractReporter.COLON_INFIX, featureName, null);
@@ -196,8 +176,20 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
                 rq.setName(parameters.getLaunchName());
                 rq.setStartTime(startTime);
                 rq.setMode(parameters.getLaunchRunningMode());
-                rq.setTags(parameters.getTags());
+                rq.setAttributes(parameters.getAttributes());
                 rq.setDescription(parameters.getDescription());
+                rq.setRerun(parameters.isRerun());
+                if (!isNullOrEmpty(parameters.getRerunOf())) {
+                    rq.setRerunOf(parameters.getRerunOf());
+                }
+
+                if (null != parameters.getSkippedAnIssue()) {
+                    ItemAttributesRQ skippedIssueAttribute = new ItemAttributesRQ();
+                    skippedIssueAttribute.setKey(SKIPPED_ISSUE_KEY);
+                    skippedIssueAttribute.setValue(parameters.getSkippedAnIssue().toString());
+                    skippedIssueAttribute.setSystem(true);
+                    rq.getAttributes().add(skippedIssueAttribute);
+                }
 
                 return reportPortal.newLaunch(rq);
             }
@@ -296,7 +288,6 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
     }
 
     protected abstract Maybe<String> getRootItemId();
-
 
     /**
      * Private part that responsible for handling events
@@ -397,16 +388,19 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
         String featureURI = buildFeatureNode(testCase);
         RunningContext.FeatureContext currentFeatureContext = currentFeatureContextMap.get(featureURI);
 
-        currentFeatureContext = currentFeatureContext == null ?
-                createFeatureContext(testCase, featureURI) : currentFeatureContext;
+        currentFeatureContext = currentFeatureContext == null ? createFeatureContext(testCase, featureURI) : currentFeatureContext;
 
         if (!currentFeatureContext.getUri().equals(testCase.getUri())) {
             throw new IllegalStateException("Scenario URI does not match Feature URI.");
         }
 
         RunningContext.ScenarioContext scenarioContext = currentFeatureContext.getScenarioContext(testCase);
-        String scenarioName = Utils.buildNodeName(scenarioContext.getKeyword(), AbstractReporter.COLON_INFIX,
-                scenarioContext.getName(), scenarioContext.getOutlineIteration());
+        String scenarioName = Utils.buildNodeName(
+                scenarioContext.getKeyword(),
+                AbstractReporter.COLON_INFIX,
+                scenarioContext.getName(),
+                scenarioContext.getOutlineIteration()
+        );
 
         Pair<String, String> scenarioNameFeatureURI = new Pair<String, String>(scenarioName, currentFeatureContext.getUri());
         RunningContext.ScenarioContext currentScenarioContext = currentScenarioContextMap.get(scenarioNameFeatureURI);
@@ -429,11 +423,10 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
         Maybe<String> root = getRootItemId();
         rq.setDescription(currentFeatureContext.getUri());
         rq.setName(featureURI.substring(featureURI.lastIndexOf('\\') + 1, featureURI.indexOf(".feature")));
-        rq.setTags(currentFeatureContext.getTags());
+        rq.setAttributes(currentFeatureContext.getAttributes());
         rq.setStartTime(Calendar.getInstance().getTime());
         rq.setType(getFeatureTestItemType());
-        currentFeatureContext.setFeatureId(root == null ?
-                launch.get().startTestItem(rq) : launch.get().startTestItem(root, rq));
+        currentFeatureContext.setFeatureId(root == null ? launch.get().startTestItem(rq) : launch.get().startTestItem(root, rq));
         return currentFeatureContext;
     }
 
