@@ -25,7 +25,6 @@ import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
 import cucumber.api.*;
 import cucumber.api.event.*;
-import cucumber.api.formatter.Formatter;
 import io.reactivex.Maybe;
 import org.apache.tika.mime.MimeTypeException;
 import org.apache.tika.mime.MimeTypes;
@@ -46,7 +45,7 @@ import java.util.HashSet;
  * @author Serhii Zharskyi
  * @author Vitaliy Tsvihun
  */
-public abstract class AbstractReporter implements Formatter {
+public abstract class AbstractReporter implements EventListener, Plugin {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReporter.class);
 
