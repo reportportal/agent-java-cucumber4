@@ -15,6 +15,7 @@
  */
 package com.epam.reportportal.cucumber;
 
+import com.epam.reportportal.annotations.TestCaseId;
 import com.epam.reportportal.listeners.Statuses;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
@@ -265,7 +266,40 @@ public class Utils {
 
     }
 
-    private static Field getDefinitionMatchField(TestStep testStep) {
+	public static int getTestCaseId(TestStep testStep, String codeRef) {
+		Field definitionMatchField = getDefinitionMatchField(testStep);
+		if (definitionMatchField != null) {
+			try {
+				StepDefinitionMatch stepDefinitionMatch = (StepDefinitionMatch) definitionMatchField.get(testStep);
+				Field stepDefinitionField = stepDefinitionMatch.getClass().getDeclaredField(STEP_DEFINITION_FIELD_NAME);
+				stepDefinitionField.setAccessible(true);
+				Object javaStepDefinition = stepDefinitionField.get(stepDefinitionMatch);
+				Field methodField = javaStepDefinition.getClass().getDeclaredField("method");
+				methodField.setAccessible(true);
+				Method method = (Method) methodField.get(javaStepDefinition);
+				TestCaseId testCaseIdAnnotation = method.getAnnotation(TestCaseId.class);
+				return testCaseIdAnnotation != null ?
+						testCaseIdAnnotation.value() :
+						getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
+			} catch (NoSuchFieldException e) {
+				return getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
+			} catch (IllegalAccessException e) {
+				return getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
+			}
+		} else {
+			return getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
+		}
+	}
+
+	private static int getTestCaseId(String codeRef, List<cucumber.api.Argument> arguments) {
+		List<String> values = new ArrayList<String>(arguments.size());
+		for (cucumber.api.Argument argument : arguments) {
+			values.add(argument.getValue());
+		}
+		return Arrays.deepHashCode(new Object[] { codeRef, values });
+	}
+
+	private static Field getDefinitionMatchField(TestStep testStep) {
 
         Class<?> clazz = testStep.getClass();
 
