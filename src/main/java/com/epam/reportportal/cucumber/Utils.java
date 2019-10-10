@@ -60,6 +60,7 @@ public class Utils {
     private static final String STEP_DEFINITION_FIELD_NAME = "stepDefinition";
     private static final String GET_LOCATION_METHOD_NAME = "getLocation";
     private static final String METHOD_OPENING_BRACKET = "(";
+    private static final String METHOD_FIELD_NAME = "method";
 
     private Utils() {
         throw new AssertionError("No instances should exist for the class!");
@@ -274,7 +275,7 @@ public class Utils {
 				Field stepDefinitionField = stepDefinitionMatch.getClass().getDeclaredField(STEP_DEFINITION_FIELD_NAME);
 				stepDefinitionField.setAccessible(true);
 				Object javaStepDefinition = stepDefinitionField.get(stepDefinitionMatch);
-				Field methodField = javaStepDefinition.getClass().getDeclaredField("method");
+                Field methodField = javaStepDefinition.getClass().getDeclaredField(METHOD_FIELD_NAME);
 				methodField.setAccessible(true);
 				Method method = (Method) methodField.get(javaStepDefinition);
 				TestCaseId testCaseIdAnnotation = method.getAnnotation(TestCaseId.class);
