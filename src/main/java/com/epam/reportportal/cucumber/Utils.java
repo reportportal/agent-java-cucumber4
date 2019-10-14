@@ -299,7 +299,7 @@ public class Utils {
             for (cucumber.api.Argument argument : arguments) {
                 values.add(argument.getValue());
             }
-            return TestCaseIdUtils.getTestCaseId(testCaseId, method, values);
+            return TestCaseIdUtils.getTestCaseId(testCaseId, method, values.toArray());
         } else {
             return testCaseId.value();
         }
@@ -310,7 +310,7 @@ public class Utils {
 		for (cucumber.api.Argument argument : arguments) {
 			values.add(argument.getValue());
 		}
-		return Arrays.deepHashCode(new Object[] { codeRef, values });
+		return Arrays.deepHashCode(new Object[] { codeRef, values.toArray() });
 	}
 
 	private static Field getDefinitionMatchField(TestStep testStep) {
