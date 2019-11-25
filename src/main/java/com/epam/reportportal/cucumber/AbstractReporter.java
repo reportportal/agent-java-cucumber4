@@ -418,11 +418,13 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
         RunningContext.FeatureContext currentFeatureContext;
         currentFeatureContext = new RunningContext.FeatureContext().processTestSourceReadEvent(testCase);
         currentFeatureContextMap.put(featureURI, currentFeatureContext);
+        String featureKeyword = currentFeatureContext.getFeature().getKeyword();
+        String featureName = currentFeatureContext.getFeature().getName();
 
         StartTestItemRQ rq = new StartTestItemRQ();
         Maybe<String> root = getRootItemId();
         rq.setDescription(currentFeatureContext.getUri());
-        rq.setName(featureURI.substring(featureURI.lastIndexOf('\\') + 1, featureURI.indexOf(".feature")));
+        rq.setName(Utils.buildNodeName(featureKeyword, AbstractReporter.COLON_INFIX, featureName, null));
         rq.setAttributes(currentFeatureContext.getAttributes());
         rq.setStartTime(Calendar.getInstance().getTime());
         rq.setType(getFeatureTestItemType());
