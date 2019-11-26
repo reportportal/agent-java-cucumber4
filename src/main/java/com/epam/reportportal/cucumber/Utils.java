@@ -297,7 +297,7 @@ public class Utils {
 
 	@Nullable
     private static Integer getTestCaseId(TestCaseId testCaseId, Method method, List<cucumber.api.Argument> arguments) {
-        if (testCaseId.isParameterized()) {
+        if (testCaseId.parametrized()) {
             List<String> values = new ArrayList<String>(arguments.size());
             for (cucumber.api.Argument argument : arguments) {
                 values.add(argument.getValue());
