@@ -74,6 +74,7 @@ public class StepReporter extends AbstractReporter {
         String codeRef = Utils.getCodeRef(testStep);
         rq.setCodeRef(codeRef);
         rq.setTestCaseId(Utils.getTestCaseId(testStep, codeRef));
+        rq.setAttributes(Utils.getAttributes(testStep));
         currentStepId = launch.get().startTestItem(currentScenarioContext.getId(), rq);
     }
 
