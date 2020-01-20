@@ -17,6 +17,7 @@ package com.epam.reportportal.cucumber;
 
 import com.epam.reportportal.listeners.Statuses;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
+import cucumber.api.HookType;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
 import gherkin.ast.Step;
@@ -81,11 +82,31 @@ public class StepReporter extends AbstractReporter {
     }
 
     @Override
-    protected void beforeHooks(Boolean isBefore) {
+    protected void beforeHooks(HookType hookType) {
         StartTestItemRQ rq = new StartTestItemRQ();
-        rq.setName(isBefore ? "Before hooks" : "After hooks");
+        String name = null;
+        String type = null;
+        switch (hookType) {
+            case Before:
+                name = "Before hooks";
+                type = "BEFORE_TEST";
+                break;
+            case After:
+                name = "After hooks";
+                type = "AFTER_TEST";
+                break;
+            case AfterStep:
+                name = "After step";
+                type = "AFTER_METHOD";
+                break;
+            case BeforeStep:
+                name = "Before step";
+                type = "BEFORE_METHOD";
+                break;
+        }
+        rq.setName(name);
         rq.setStartTime(Calendar.getInstance().getTime());
-        rq.setType(isBefore ? "BEFORE_TEST" : "AFTER_TEST");
+        rq.setType(type);
 
         hookStepId = RP.get().startTestItem(currentScenarioContext.getId(), rq);
         hookStatus = Statuses.PASSED;
