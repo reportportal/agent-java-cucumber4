@@ -17,6 +17,7 @@ package com.epam.reportportal.cucumber;
 
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import cucumber.api.HookTestStep;
+import cucumber.api.HookType;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
 import gherkin.ast.Step;
@@ -91,7 +92,7 @@ public class ScenarioReporter extends AbstractReporter {
     }
 
     @Override
-    protected void beforeHooks(Boolean isBefore) {
+    protected void beforeHooks(HookType hookType) {
         // noop
     }
 
