@@ -116,6 +116,7 @@ public class StepReporter extends AbstractReporter {
         }
         rq.setName(name);
         rq.setType(type);
+        rq.setStartTime(Calendar.getInstance().getTime());
 
         hookStepId = launch.get().startTestItem(getCurrentScenarioContext().getId(), rq);
         hookStatus = Statuses.PASSED;
