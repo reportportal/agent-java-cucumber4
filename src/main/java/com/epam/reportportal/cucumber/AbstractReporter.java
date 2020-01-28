@@ -212,10 +212,8 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 
 	/**
 	 * Called when before/after-hooks are started
-	 *
-	 * @param isBefore - if true, before-hook is started, if false - after-hook
 	 */
-	protected abstract void beforeHooks(Boolean isBefore);
+	protected abstract void beforeHooks(HookType hookType);
 
 	/**
 	 * Called when before/after-hooks are finished
@@ -435,7 +433,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	private void handleTestStepStarted(TestStepStarted event) {
 		TestStep testStep = event.testStep;
 		if (testStep instanceof HookTestStep) {
-			beforeHooks(isBefore(testStep));
+			beforeHooks(((HookTestStep) testStep).getHookType());
 		} else {
 			if (getCurrentScenarioContext().withBackground()) {
 				getCurrentScenarioContext().nextBackgroundStep();
