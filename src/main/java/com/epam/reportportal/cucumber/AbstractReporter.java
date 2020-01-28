@@ -213,7 +213,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	/**
 	 * Called when before/after-hooks are started
 	 */
-    protected abstract void beforeHooks(HookType hookType);
+	protected abstract void beforeHooks(HookType hookType);
 
 	/**
 	 * Called when before/after-hooks are finished
