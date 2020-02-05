@@ -18,6 +18,7 @@ package com.epam.reportportal.cucumber;
 import com.epam.reportportal.listeners.ListenerParameters;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
+import com.epam.reportportal.utils.properties.SystemAttributesExtractor;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
@@ -47,6 +48,8 @@ import static rp.com.google.common.base.Strings.isNullOrEmpty;
  * @author Vitaliy Tsvihun
  */
 public abstract class AbstractReporter implements ConcurrentEventListener {
+
+	private static final String AGENT_PROPERTIES_FILE = "agent.properties";
 
 	Supplier<Launch> launch;
 	static final String COLON_INFIX = ": ";
@@ -177,6 +180,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 				rq.setStartTime(startTime);
 				rq.setMode(parameters.getLaunchRunningMode());
 				rq.setAttributes(parameters.getAttributes());
+				rq.getAttributes().addAll(SystemAttributesExtractor.extract(AGENT_PROPERTIES_FILE));
 				rq.setDescription(parameters.getDescription());
 				rq.setRerun(parameters.isRerun());
 				if (!isNullOrEmpty(parameters.getRerunOf())) {
