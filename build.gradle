@@ -23,6 +23,9 @@ dependencies {
         compile 'com.github.reportportal:commons-model:feec39f3'
     }
     compile 'io.cucumber:cucumber-java:4.7.1'
+    testCompile 'org.hamcrest:hamcrest-all:1.3'
+    testCompile 'junit:junit:4.12'
+    testCompile 'org.mockito:mockito-all:2.0.2-beta'
 }
 
 wrapper {
