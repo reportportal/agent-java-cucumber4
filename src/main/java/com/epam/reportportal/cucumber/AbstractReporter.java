@@ -18,6 +18,7 @@ package com.epam.reportportal.cucumber;
 import com.epam.reportportal.listeners.ListenerParameters;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
+import com.epam.reportportal.utils.properties.SystemAttributesExtractor;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
@@ -47,6 +48,8 @@ import static rp.com.google.common.base.Strings.isNullOrEmpty;
  * @author Vitaliy Tsvihun
  */
 public abstract class AbstractReporter implements ConcurrentEventListener {
+
+	private static final String AGENT_PROPERTIES_FILE = "agent.properties";
 
 	Supplier<Launch> launch;
 	static final String COLON_INFIX = ": ";
@@ -105,6 +108,15 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	}
 
 	/**
+	 * Extension point to customize ReportPortal instance
+	 *
+	 * @return ReportPortal
+	 */
+	protected ReportPortal buildReportPortal() {
+		return ReportPortal.builder().build();
+	}
+
+	/**
 	 * Finish RP launch
 	 */
 	protected void afterLaunch() {
@@ -118,8 +130,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 */
 	private void beforeScenario(RunningContext.FeatureContext currentFeatureContext, RunningContext.ScenarioContext currentScenarioContext,
 			String scenarioName) {
-		Maybe<String> id = Utils.startNonLeafNode(
-				launch.get(),
+		Maybe<String> id = Utils.startNonLeafNode(launch.get(),
 				currentFeatureContext.getFeatureId(),
 				scenarioName,
 				currentFeatureContext.getUri() + ":" + currentScenarioContext.getLine(),
@@ -169,7 +180,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 
 			@Override
 			public Launch get() {
-				final ReportPortal reportPortal = ReportPortal.builder().build();
+				final ReportPortal reportPortal = buildReportPortal();
 				ListenerParameters parameters = reportPortal.getParameters();
 
 				StartLaunchRQ rq = new StartLaunchRQ();
@@ -177,6 +188,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 				rq.setStartTime(startTime);
 				rq.setMode(parameters.getLaunchRunningMode());
 				rq.setAttributes(parameters.getAttributes());
+				rq.getAttributes().addAll(SystemAttributesExtractor.extract(AGENT_PROPERTIES_FILE, AbstractReporter.class.getClassLoader()));
 				rq.setDescription(parameters.getDescription());
 				rq.setRerun(parameters.isRerun());
 				if (!isNullOrEmpty(parameters.getRerunOf())) {
@@ -212,6 +224,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 
 	/**
 	 * Called when before/after-hooks are started
+	 *
 	 * @param hookType a hook type
 	 */
 	protected abstract void beforeHooks(HookType hookType);
@@ -394,8 +407,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		}
 
 		RunningContext.ScenarioContext scenarioContext = currentFeatureContext.getScenarioContext(testCase);
-		String scenarioName = Utils.buildNodeName(
-				scenarioContext.getKeyword(),
+		String scenarioName = Utils.buildNodeName(scenarioContext.getKeyword(),
 				AbstractReporter.COLON_INFIX,
 				scenarioContext.getName(),
 				scenarioContext.getOutlineIteration()
