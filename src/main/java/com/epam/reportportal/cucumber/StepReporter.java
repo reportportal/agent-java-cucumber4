@@ -18,14 +18,13 @@ package com.epam.reportportal.cucumber;
 import com.epam.reportportal.listeners.Statuses;
 import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
-import cucumber.api.HookTestStep;
-import cucumber.api.HookType;
-import cucumber.api.Result;
-import cucumber.api.TestStep;
+import cucumber.api.*;
 import gherkin.ast.Step;
 import io.reactivex.Maybe;
 
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Cucumber reporter for ReportPortal that reports individual steps as test
@@ -48,99 +47,103 @@ import java.util.Calendar;
  * @author Vitaliy Tsvihun
  */
 public class StepReporter extends AbstractReporter {
-    private Maybe<String> currentStepId;
-    private Maybe<String> hookStepId;
-    private String hookStatus;
+	private Maybe<String> currentStepId;
+	private Maybe<String> hookStepId;
+	private String hookStatus;
 
-    public StepReporter() {
-        super();
-        currentStepId = null;
-        hookStepId = null;
-        hookStatus = null;
-    }
+	public StepReporter() {
+		super();
+		currentStepId = null;
+		hookStepId = null;
+		hookStatus = null;
+	}
 
-    @Override
-    protected Maybe<String> getRootItemId() {
-        return null;
-    }
+	@Override
+	protected Maybe<String> getRootItemId() {
+		return null;
+	}
 
-    @Override
-    protected void beforeStep(TestStep testStep) {
-        RunningContext.ScenarioContext currentScenarioContext = getCurrentScenarioContext();
-        Step step = currentScenarioContext.getStep(testStep);
-        StartTestItemRQ rq = new StartTestItemRQ();
-        rq.setName(Utils.buildNodeName(currentScenarioContext.getStepPrefix(), step.getKeyword(), Utils.getStepName(testStep), " "));
-        rq.setDescription(Utils.buildMultilineArgument(testStep));
-        rq.setStartTime(Calendar.getInstance().getTime());
-        rq.setType("STEP");
-        String codeRef = Utils.getCodeRef(testStep);
-        rq.setCodeRef(codeRef);
-        TestCaseIdEntry testCaseIdEntry = Utils.getTestCaseId(testStep, codeRef);
-        if (testCaseIdEntry != null) {
-            rq.setTestCaseId(testCaseIdEntry.getId());
-            rq.setTestCaseHash(testCaseIdEntry.getHash());
-        }
-        rq.setAttributes(Utils.getAttributes(testStep));
-        currentStepId = launch.get().startTestItem(currentScenarioContext.getId(), rq);
-    }
+	@Override
+	protected void beforeStep(TestStep testStep) {
+		RunningContext.ScenarioContext currentScenarioContext = getCurrentScenarioContext();
+		Step step = currentScenarioContext.getStep(testStep);
+		StartTestItemRQ rq = new StartTestItemRQ();
+		rq.setName(Utils.buildNodeName(currentScenarioContext.getStepPrefix(), step.getKeyword(), Utils.getStepName(testStep), " "));
+		rq.setDescription(Utils.buildMultilineArgument(testStep));
+		rq.setStartTime(Calendar.getInstance().getTime());
+		rq.setType("STEP");
+		String codeRef = Utils.getCodeRef(testStep);
+		List<Argument> arguments = testStep instanceof PickleStepTestStep ?
+				((PickleStepTestStep) testStep).getDefinitionArgument() :
+				Collections.emptyList();
+		rq.setParameters(Utils.getParameters(arguments, step.getText()));
+		rq.setCodeRef(codeRef);
+		TestCaseIdEntry testCaseIdEntry = Utils.getTestCaseId(testStep, codeRef);
+		if (testCaseIdEntry != null) {
+			rq.setTestCaseId(testCaseIdEntry.getId());
+			rq.setTestCaseHash(testCaseIdEntry.getHash());
+		}
+		rq.setAttributes(Utils.getAttributes(testStep));
+		currentStepId = launch.get().startTestItem(currentScenarioContext.getId(), rq);
+	}
 
-    @Override
-    protected void afterStep(Result result) {
-        reportResult(result, null);
-        Utils.finishTestItem(launch.get(), currentStepId, result.getStatus().toString().toUpperCase());
-        currentStepId = null;
-    }
+	@Override
+	protected void afterStep(Result result) {
+		reportResult(result, null);
+		Utils.finishTestItem(launch.get(), currentStepId, result.getStatus().toString().toUpperCase());
+		currentStepId = null;
+	}
 
-    @Override
-    protected void beforeHooks(HookType hookType) {
-        StartTestItemRQ rq = new StartTestItemRQ();
-        String name = null;
-        String type = null;
-        switch (hookType) {
-            case Before:
-                name = "Before hooks";
-                type = "BEFORE_TEST";
-                break;
-            case After:
-                name = "After hooks";
-                type = "AFTER_TEST";
-                break;
-            case AfterStep:
-                name = "After step";
-                type = "AFTER_METHOD";
-                break;
-            case BeforeStep:
-                name = "Before step";
-                type = "BEFORE_METHOD";
-                break;
-        }
-        rq.setName(name);
-        rq.setType(type);
-        rq.setStartTime(Calendar.getInstance().getTime());
+	@Override
+	protected void beforeHooks(HookType hookType) {
+		StartTestItemRQ rq = new StartTestItemRQ();
+		String name = null;
+		String type = null;
+		switch (hookType) {
+			case Before:
+				name = "Before hooks";
+				type = "BEFORE_TEST";
+				break;
+			case After:
+				name = "After hooks";
+				type = "AFTER_TEST";
+				break;
+			case AfterStep:
+				name = "After step";
+				type = "AFTER_METHOD";
+				break;
+			case BeforeStep:
+				name = "Before step";
+				type = "BEFORE_METHOD";
+				break;
+		}
+		rq.setName(name);
+		rq.setType(type);
+		rq.setStartTime(Calendar.getInstance().getTime());
 
-        hookStepId = launch.get().startTestItem(getCurrentScenarioContext().getId(), rq);
-        hookStatus = Statuses.PASSED;
-    }
+		hookStepId = launch.get().startTestItem(getCurrentScenarioContext().getId(), rq);
+		hookStatus = Statuses.PASSED;
+	}
 
-    @Override
-    protected void afterHooks(Boolean isBefore) {
-        Utils.finishTestItem(launch.get(), hookStepId, hookStatus);
-        hookStepId = null;
-    }
+	@Override
+	protected void afterHooks(Boolean isBefore) {
+		Utils.finishTestItem(launch.get(), hookStepId, hookStatus);
+		hookStepId = null;
+	}
 
-    @Override
-    protected void hookFinished(HookTestStep step, Result result, Boolean isBefore) {
-        reportResult(result, (isBefore ? "Before" : "After") + " hook: " + step.getCodeLocation());
-        hookStatus = result.getStatus().toString();
-    }
+	@Override
+	protected void hookFinished(HookTestStep step, Result result, Boolean isBefore) {
+		reportResult(result, (isBefore ? "Before" : "After") + " hook: " + step.getCodeLocation());
+		hookStatus = result.getStatus().toString();
+	}
 
-    @Override
-    protected String getFeatureTestItemType() {
-        return "SUITE";
-    }
+	@Override
+	protected String getFeatureTestItemType() {
+		return "SUITE";
+	}
 
-    @Override
-    protected String getScenarioTestItemType() {
-        return "SCENARIO";
-    }
+	@Override
+	protected String getScenarioTestItemType() {
+		return "SCENARIO";
+	}
 }
