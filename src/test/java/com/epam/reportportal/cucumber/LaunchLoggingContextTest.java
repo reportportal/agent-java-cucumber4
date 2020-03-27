@@ -27,7 +27,7 @@ public class LaunchLoggingContextTest {
 	private Launch launch;
 
 	@Test
-	public void name() {
+	public void verifyLaunchLoggingContextInit() {
 		StepReporter stepReporter = new StepReporter() {
 			@Override
 			protected ReportPortal buildReportPortal() {
