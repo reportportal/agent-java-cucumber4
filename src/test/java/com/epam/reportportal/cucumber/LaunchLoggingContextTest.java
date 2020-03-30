@@ -41,4 +41,20 @@ public class LaunchLoggingContextTest {
 
 		verify(launch, times(1)).start();
 	}
+
+	@Test
+	public void verifyLaunchLoggingContextInitScenarioReporter() {
+		ScenarioReporter scenarioReporter = new ScenarioReporter() {
+			@Override
+			protected ReportPortal buildReportPortal() {
+				return reportPortal;
+			}
+		};
+
+		when(reportPortal.getParameters()).thenReturn(listenerParameters);
+		when(reportPortal.newLaunch(any())).thenReturn(launch);
+		scenarioReporter.beforeLaunch();
+
+		verify(launch, times(1)).start();
+	}
 }
