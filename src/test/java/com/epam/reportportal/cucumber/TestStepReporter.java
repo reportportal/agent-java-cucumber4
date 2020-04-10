@@ -17,7 +17,7 @@ class TestStepReporter extends StepReporter {
 	}
 
 	@Override
-	RunningContext.ScenarioContext getCurrentScenarioContext() {
+	protected RunningContext.ScenarioContext getCurrentScenarioContext() {
 		return scenarioContext;
 	}
 }

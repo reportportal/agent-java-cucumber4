@@ -50,7 +50,10 @@ import java.lang.reflect.Method;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
+import static java.util.Optional.ofNullable;
 
 public class Utils {
 	private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
@@ -298,9 +301,10 @@ public class Utils {
 			try {
 				Method method = retrieveMethod(definitionMatchField, testStep);
 				TestCaseId testCaseIdAnnotation = method.getAnnotation(TestCaseId.class);
-				return testCaseIdAnnotation != null ?
-						getTestCaseId(testCaseIdAnnotation, method, ((PickleStepTestStep) testStep).getDefinitionArgument()) :
-						getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
+				return ofNullable(testCaseIdAnnotation).flatMap(annotation -> ofNullable(getTestCaseId(testCaseIdAnnotation,
+						method,
+						((PickleStepTestStep) testStep).getDefinitionArgument()
+				))).orElseGet(() -> getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument()));
 			} catch (NoSuchFieldException | IllegalAccessException e) {
 				return getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
 			}
@@ -349,19 +353,19 @@ public class Utils {
 			}
 			return TestCaseIdUtils.getParameterizedTestCaseId(method, values.toArray());
 		} else {
-			return new TestCaseIdEntry(testCaseId.value(), testCaseId.value().hashCode());
+			return new TestCaseIdEntry(testCaseId.value());
 		}
 	}
 
 	private static TestCaseIdEntry getTestCaseId(String codeRef, List<cucumber.api.Argument> arguments) {
-		List<String> values = new ArrayList<String>(arguments.size());
-		for (cucumber.api.Argument argument : arguments) {
-			values.add(argument.getValue());
-		}
-		return new TestCaseIdEntry(StringUtils.join(codeRef, values.toArray()),
-				Arrays.deepHashCode(new Object[] { codeRef, values.toArray() })
-		);
+		return ofNullable(arguments).filter(args -> !args.isEmpty())
+				.map(args -> new TestCaseIdEntry(codeRef + TRANSFORM_PARAMETERS.apply(args)))
+				.orElseGet(() -> new TestCaseIdEntry(codeRef));
 	}
+
+	private static final Function<List<cucumber.api.Argument>, String> TRANSFORM_PARAMETERS = it -> "[" + it.stream()
+			.map(cucumber.api.Argument::getValue)
+			.collect(Collectors.joining(",")) + "]";
 
 	private static Field getDefinitionMatchField(TestStep testStep) {
 

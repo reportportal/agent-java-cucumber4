@@ -67,6 +67,10 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	// End of feature occurs once launch is finished.
 	private Map<String, Date> featureEndTime = Collections.synchronizedMap(new HashMap<String, Date>());
 
+	protected void setThreadCurrentScenarioContextMap(Map<Long, RunningContext.ScenarioContext> threadCurrentScenarioContextMap) {
+		this.threadCurrentScenarioContextMap = threadCurrentScenarioContextMap;
+	}
+
 	/**
 	 * Registers an event handler for a specific event.
 	 * <p>
@@ -96,7 +100,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		publisher.registerHandlerFor(WriteEvent.class, getWriteEventHandler());
 	}
 
-	RunningContext.ScenarioContext getCurrentScenarioContext() {
+	protected RunningContext.ScenarioContext getCurrentScenarioContext() {
 		return threadCurrentScenarioContextMap.get(Thread.currentThread().getId());
 	}
 
