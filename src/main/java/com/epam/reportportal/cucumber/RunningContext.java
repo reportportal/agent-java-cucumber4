@@ -183,8 +183,8 @@ class RunningContext {
          **/
         void processScenarioOutline(ScenarioDefinition scenarioDefinition) {
             if (isScenarioOutline(scenarioDefinition) && !hasOutlineSteps()) {
-                String outlineIdentifyer = " [" + scenarioDesignation.replaceAll(".*\\.feature:|\\ #.*", "") + "]";
-                outlineIterationsMap.put(scenarioDesignation, outlineIdentifyer);
+                String outlineIdentifier = " [" + scenarioDesignation.replaceAll(".*\\.feature:|\\ #.*", "") + "]";
+                outlineIterationsMap.put(scenarioDesignation, outlineIdentifier);
             }
         }
 
@@ -232,7 +232,7 @@ class RunningContext {
 
         void setId(Maybe<String> newId) {
             if (id != null) {
-                throw new IllegalStateException("Attempting re-set scenario ID for unfinished scenario.");
+                throw new IllegalStateException("Attempting re-set scenario ID for unfinished scenario: " + getName());
             }
             id = newId;
         }
