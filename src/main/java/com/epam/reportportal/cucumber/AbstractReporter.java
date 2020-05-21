@@ -67,6 +67,10 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	// End of feature occurs once launch is finished.
 	private Map<String, Date> featureEndTime = Collections.synchronizedMap(new HashMap<String, Date>());
 
+	protected void setThreadCurrentScenarioContextMap(Map<Long, RunningContext.ScenarioContext> threadCurrentScenarioContextMap) {
+		this.threadCurrentScenarioContextMap = threadCurrentScenarioContextMap;
+	}
+
 	/**
 	 * Registers an event handler for a specific event.
 	 * <p>
@@ -96,7 +100,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		publisher.registerHandlerFor(WriteEvent.class, getWriteEventHandler());
 	}
 
-	RunningContext.ScenarioContext getCurrentScenarioContext() {
+	protected RunningContext.ScenarioContext getCurrentScenarioContext() {
 		return threadCurrentScenarioContextMap.get(Thread.currentThread().getId());
 	}
 
@@ -105,6 +109,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 */
 	protected void beforeLaunch() {
 		startLaunch();
+		launch.get().start();
 	}
 
 	/**
@@ -130,7 +135,8 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 */
 	private void beforeScenario(RunningContext.FeatureContext currentFeatureContext, RunningContext.ScenarioContext currentScenarioContext,
 			String scenarioName) {
-		Maybe<String> id = Utils.startNonLeafNode(launch.get(),
+		Maybe<String> id = Utils.startNonLeafNode(
+				launch.get(),
 				currentFeatureContext.getFeatureId(),
 				scenarioName,
 				currentFeatureContext.getUri() + ":" + currentScenarioContext.getLine(),
@@ -188,7 +194,8 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 				rq.setStartTime(startTime);
 				rq.setMode(parameters.getLaunchRunningMode());
 				rq.setAttributes(parameters.getAttributes());
-				rq.getAttributes().addAll(SystemAttributesExtractor.extract(AGENT_PROPERTIES_FILE, AbstractReporter.class.getClassLoader()));
+				rq.getAttributes()
+						.addAll(SystemAttributesExtractor.extract(AGENT_PROPERTIES_FILE, AbstractReporter.class.getClassLoader()));
 				rq.setDescription(parameters.getDescription());
 				rq.setRerun(parameters.isRerun());
 				if (!isNullOrEmpty(parameters.getRerunOf())) {
@@ -407,13 +414,14 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		}
 
 		RunningContext.ScenarioContext scenarioContext = currentFeatureContext.getScenarioContext(testCase);
-		String scenarioName = Utils.buildNodeName(scenarioContext.getKeyword(),
+		String scenarioName = Utils.buildNodeName(
+				scenarioContext.getKeyword(),
 				AbstractReporter.COLON_INFIX,
 				scenarioContext.getName(),
 				scenarioContext.getOutlineIteration()
 		);
 
-		Pair<String, String> scenarioNameFeatureURI = Pair.of(scenarioName, currentFeatureContext.getUri());
+		Pair<String, String> scenarioNameFeatureURI = Pair.of(testCase.getScenarioDesignation(), currentFeatureContext.getUri());
 		RunningContext.ScenarioContext currentScenarioContext = currentScenarioContextMap.get(scenarioNameFeatureURI);
 
 		if (currentScenarioContext == null) {

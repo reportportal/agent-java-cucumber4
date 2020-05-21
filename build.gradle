@@ -16,13 +16,13 @@ repositories {
 
 dependencies {
     if (releaseMode) {
-        compile 'com.epam.reportportal:client-java:5.0.0-BETA-9'
+        compile 'com.epam.reportportal:client-java:5.0.0-RC-1'
         compile 'com.epam.reportportal:commons-model:5.0.0'
     } else {
-        compile 'com.github.reportportal:client-java:51aef16'
+        compile 'com.epam.reportportal:client-java:5.0.0-RC-1'
         compile 'com.github.reportportal:commons-model:5.0.0'
     }
-    compile 'io.cucumber:cucumber-java:4.7.1'
+    compile 'io.cucumber:cucumber-java:4.8.1'
     testCompile 'org.hamcrest:hamcrest-all:1.3'
     testCompile 'junit:junit:4.12'
     testCompile 'org.mockito:mockito-all:2.0.2-beta'
