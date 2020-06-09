@@ -269,7 +269,7 @@ class RunningContext {
 
         void setId(Maybe<String> newId) {
             if (id != null) {
-                throw new IllegalStateException("Attempting re-set scenario ID for unfinished scenario.");
+                throw new IllegalStateException("Attempting re-set scenario ID for unfinished scenario: " + getName());
             }
             id = newId;
         }

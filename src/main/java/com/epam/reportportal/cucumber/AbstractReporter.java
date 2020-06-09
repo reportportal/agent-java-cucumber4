@@ -421,7 +421,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 				scenarioContext.getOutlineIteration()
 		);
 
-		Pair<String, String> scenarioNameFeatureURI = Pair.of(scenarioName, currentFeatureContext.getUri());
+		Pair<String, String> scenarioNameFeatureURI = Pair.of(testCase.getScenarioDesignation(), currentFeatureContext.getUri());
 		RunningContext.ScenarioContext currentScenarioContext = currentScenarioContextMap.get(scenarioNameFeatureURI);
 
 		if (currentScenarioContext == null) {
