@@ -62,7 +62,7 @@ public class ScenarioReporter extends AbstractReporter {
     private static final String RP_STORY_TYPE = "STORY";
     private static final String DUMMY_ROOT_SUITE_NAME = "Root User Story";
 
-    private Supplier<Maybe<String>> rootSuiteId;
+    protected Supplier<Maybe<String>> rootSuiteId;
 
     @Override
     protected void beforeLaunch() {
@@ -130,7 +130,7 @@ public class ScenarioReporter extends AbstractReporter {
     /**
      * Finish root suite
      */
-    private void finishRootItem() {
+    protected void finishRootItem() {
         Utils.finishTestItem(launch.get(), rootSuiteId.get());
         rootSuiteId = null;
     }
@@ -138,7 +138,7 @@ public class ScenarioReporter extends AbstractReporter {
     /**
      * Start root suite
      */
-    private void startRootItem() {
+    protected void startRootItem() {
         rootSuiteId = Suppliers.memoize(new Supplier<Maybe<String>>() {
             @Override
             public Maybe<String> get() {
@@ -157,7 +157,7 @@ public class ScenarioReporter extends AbstractReporter {
      * @param message to decorate
      * @return decorated message
      */
-    private String decorateMessage(String message) {
+    protected String decorateMessage(String message) {
         return SEPARATOR + message;
     }
 }

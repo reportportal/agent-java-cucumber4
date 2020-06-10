@@ -51,7 +51,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 
 	private static final String AGENT_PROPERTIES_FILE = "agent.properties";
 
-	Supplier<Launch> launch;
+    protected Supplier<Launch> launch;
 	static final String COLON_INFIX = ": ";
 	private static final String SKIPPED_ISSUE_KEY = "skippedIssue";
 	private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReporter.class);
@@ -133,7 +133,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	/**
 	 * Start Cucumber scenario
 	 */
-	private void beforeScenario(RunningContext.FeatureContext currentFeatureContext, RunningContext.ScenarioContext currentScenarioContext,
+	protected void beforeScenario(RunningContext.FeatureContext currentFeatureContext, RunningContext.ScenarioContext currentScenarioContext,
 			String scenarioName) {
 		Maybe<String> id = Utils.startNonLeafNode(
 				launch.get(),
@@ -150,7 +150,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 * Finish Cucumber scenario
 	 * Put scenario end time in a map to check last scenario end time per feature
 	 */
-	private void afterScenario(TestCaseFinished event) {
+	protected void afterScenario(TestCaseFinished event) {
 		RunningContext.ScenarioContext currentScenarioContext = getCurrentScenarioContext();
 		for (Map.Entry<Pair<String, String>, RunningContext.ScenarioContext> scenarioContext : currentScenarioContextMap.entrySet()) {
 			if (scenarioContext.getValue().getLine() == currentScenarioContext.getLine()) {
@@ -167,7 +167,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 * It's essential to operate with feature URI,
 	 * to prevent problems with the same feature names in different folders/packages
 	 */
-	private String buildFeatureNode(TestCase testCase) {
+    protected String buildFeatureNode(TestCase testCase) {
 		RunningContext.FeatureContext featureContext = new RunningContext.FeatureContext().processTestSourceReadEvent(testCase);
 		String featureKeyword = featureContext.getFeature().getKeyword();
 		String featureName = featureContext.getFeature().getName();
@@ -178,7 +178,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	/**
 	 * Start RP launch
 	 */
-	private void startLaunch() {
+	protected void startLaunch() {
 		launch = Suppliers.memoize(new Supplier<Launch>() {
 
 			/* should no be lazy */
@@ -284,7 +284,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		}
 	}
 
-	private void embedding(String mimeType, byte[] data) {
+	protected void embedding(String mimeType, byte[] data) {
 		File file = new File();
 		String embeddingName;
 		try {
@@ -298,7 +298,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		Utils.sendLog(embeddingName, "UNKNOWN", file);
 	}
 
-	private void write(String text) {
+	protected void write(String text) {
 		Utils.sendLog(text, "INFO", null);
 	}
 
@@ -312,7 +312,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 * Private part that responsible for handling events
 	 */
 
-	private EventHandler<TestRunStarted> getTestRunStartedHandler() {
+    protected EventHandler<TestRunStarted> getTestRunStartedHandler() {
 		return new EventHandler<TestRunStarted>() {
 			@Override
 			public void receive(TestRunStarted event) {
@@ -321,7 +321,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		};
 	}
 
-	private EventHandler<TestSourceRead> getTestSourceReadHandler() {
+    protected EventHandler<TestSourceRead> getTestSourceReadHandler() {
 		return new EventHandler<TestSourceRead>() {
 			@Override
 			public void receive(TestSourceRead event) {
@@ -330,7 +330,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		};
 	}
 
-	private EventHandler<TestCaseStarted> getTestCaseStartedHandler() {
+    protected EventHandler<TestCaseStarted> getTestCaseStartedHandler() {
 		return new EventHandler<TestCaseStarted>() {
 			@Override
 			public void receive(TestCaseStarted event) {
@@ -339,7 +339,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		};
 	}
 
-	private EventHandler<TestStepStarted> getTestStepStartedHandler() {
+    protected EventHandler<TestStepStarted> getTestStepStartedHandler() {
 		return new EventHandler<TestStepStarted>() {
 			@Override
 			public void receive(TestStepStarted event) {
@@ -348,7 +348,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		};
 	}
 
-	private EventHandler<TestStepFinished> getTestStepFinishedHandler() {
+    protected EventHandler<TestStepFinished> getTestStepFinishedHandler() {
 		return new EventHandler<TestStepFinished>() {
 			@Override
 			public void receive(TestStepFinished event) {
@@ -357,7 +357,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		};
 	}
 
-	private EventHandler<TestCaseFinished> getTestCaseFinishedHandler() {
+    protected EventHandler<TestCaseFinished> getTestCaseFinishedHandler() {
 		return new EventHandler<TestCaseFinished>() {
 			@Override
 			public void receive(TestCaseFinished event) {
@@ -366,7 +366,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		};
 	}
 
-	private EventHandler<TestRunFinished> getTestRunFinishedHandler() {
+    protected EventHandler<TestRunFinished> getTestRunFinishedHandler() {
 		return new EventHandler<TestRunFinished>() {
 			@Override
 			public void receive(TestRunFinished event) {
@@ -376,7 +376,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		};
 	}
 
-	private EventHandler<EmbedEvent> getEmbedEventHandler() {
+    protected EventHandler<EmbedEvent> getEmbedEventHandler() {
 		return new EventHandler<EmbedEvent>() {
 			@Override
 			public void receive(EmbedEvent event) {
@@ -385,7 +385,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		};
 	}
 
-	private EventHandler<WriteEvent> getWriteEventHandler() {
+    protected EventHandler<WriteEvent> getWriteEventHandler() {
 		return new EventHandler<WriteEvent>() {
 			@Override
 			public void receive(WriteEvent event) {
@@ -394,7 +394,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		};
 	}
 
-	private void handleEndOfFeature() {
+	protected void handleEndOfFeature() {
 		for (RunningContext.FeatureContext value : currentFeatureContextMap.values()) {
 			Date featureCompletionDateTime = featureEndTime.get(value.getUri());
 			Utils.finishFeature(launch.get(), value.getFeatureId(), featureCompletionDateTime);
@@ -402,7 +402,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		currentFeatureContextMap.clear();
 	}
 
-	private void handleStartOfTestCase(TestCaseStarted event) {
+	protected void handleStartOfTestCase(TestCaseStarted event) {
 		TestCase testCase = event.testCase;
 		String featureURI = buildFeatureNode(testCase);
 		RunningContext.FeatureContext currentFeatureContext = currentFeatureContextMap.get(featureURI);
@@ -451,7 +451,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		return currentFeatureContext;
 	}
 
-	private void handleTestStepStarted(TestStepStarted event) {
+	protected void handleTestStepStarted(TestStepStarted event) {
 		TestStep testStep = event.testStep;
 		if (testStep instanceof HookTestStep) {
 			beforeHooks(((HookTestStep) testStep).getHookType());
@@ -463,7 +463,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		}
 	}
 
-	private void handleTestStepFinished(TestStepFinished event) {
+	protected void handleTestStepFinished(TestStepFinished event) {
 		if (event.testStep instanceof HookTestStep) {
 			hookFinished((HookTestStep) event.testStep, event.result, isBefore(event.testStep));
 			afterHooks(isBefore(event.testStep));
