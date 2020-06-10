@@ -201,27 +201,24 @@ class RunningContext {
          **/
         void processScenarioOutline(ScenarioDefinition scenarioOutline) {
             if (isScenarioOutline(scenarioOutline)) {
-                String scenarioAbsoluteName = scenarioDesignation.replaceAll(":\\d+", StringUtils.EMPTY);
-                synchronized (OUTLINE_SYNC) {
-                    if (scenarioOutlineMap.get(scenarioAbsoluteName) == null) {
-                        List<Integer> exampleLineNumberList = new ArrayList<>();
-                        for (Examples example : ((ScenarioOutline) scenarioOutline).getExamples()) {
-                            for (TableRow tableRow : example.getTableBody()) {
-                                exampleLineNumberList.add(tableRow.getLocation().getLine());
-                            }
-                        }
-                        scenarioOutlineMap.put(scenarioAbsoluteName, exampleLineNumberList);
-                    }
-                }
-                for (int i = 0; i < scenarioOutlineMap.get(scenarioAbsoluteName).size(); i++) {
-                    if (getLine() == scenarioOutlineMap.get(scenarioAbsoluteName).get(i)) {
-                        outlineIteration = String.format("[%d]", i + 1);
-                        break;
-                    }
-                }
-                if (StringUtils.isEmpty(outlineIteration)) {
-                    throw new IllegalStateException(String.format("No outline iteration number found for scenario %s", scenarioDesignation));
-                }
+                String scenarioAbsoluteName = scenarioDesignation.replaceAll(":\\d+", "");
+                List<Integer> outlineLines = scenarioOutlineMap.computeIfAbsent(
+                        scenarioAbsoluteName,
+                        k -> ((ScenarioOutline) scenarioOutline).getExamples()
+                                .stream()
+                                .flatMap(e -> e.getTableBody().stream())
+                                .map(r -> r.getLocation().getLine())
+                                .collect(Collectors.toList())
+                );
+                int line = getLine();
+                int iterationIdx = IntStream.range(0, outlineLines.size())
+                        .filter(i -> line == outlineLines.get(i))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException(String.format(
+                                "No outline iteration number found for scenario %s",
+                                scenarioDesignation
+                        )));
+                outlineIteration = String.format("[%d]", iterationIdx + 1);
             }
         }
 
