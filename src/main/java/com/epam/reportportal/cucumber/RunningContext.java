@@ -34,10 +34,8 @@ import gherkin.ast.Step;
 import gherkin.ast.TableRow;
 import gherkin.pickles.PickleTag;
 import io.reactivex.Maybe;
-import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -45,6 +43,8 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Running context that contains mostly manipulations with Gherkin objects.
@@ -202,17 +202,18 @@ class RunningContext {
         void processScenarioOutline(ScenarioDefinition scenarioOutline) {
             if (isScenarioOutline(scenarioOutline)) {
                 String scenarioAbsoluteName = scenarioDesignation.replaceAll(":\\d+", "");
-                List<Integer> outlineLines = scenarioOutlineMap.computeIfAbsent(
-                        scenarioAbsoluteName,
-                        k -> ((ScenarioOutline) scenarioOutline).getExamples()
-                                .stream()
-                                .flatMap(e -> e.getTableBody().stream())
-                                .map(r -> r.getLocation().getLine())
-                                .collect(Collectors.toList())
-                );
-                int line = getLine();
-                int iterationIdx = IntStream.range(0, outlineLines.size())
-                        .filter(i -> line == outlineLines.get(i))
+                synchronized (OUTLINE_SYNC) {
+                    scenarioOutlineMap.computeIfAbsent(
+                            scenarioAbsoluteName,
+                            k -> ((ScenarioOutline) scenarioOutline).getExamples()
+                                    .stream()
+                                    .flatMap(e -> e.getTableBody().stream())
+                                    .map(r -> r.getLocation().getLine())
+                                    .collect(Collectors.toList())
+                    );
+                }
+                int iterationIdx = IntStream.range(0, scenarioOutlineMap.get(scenarioAbsoluteName).size())
+                        .filter(i -> getLine() == scenarioOutlineMap.get(scenarioAbsoluteName).get(i))
                         .findFirst()
                         .orElseThrow(() -> new IllegalStateException(String.format(
                                 "No outline iteration number found for scenario %s",
