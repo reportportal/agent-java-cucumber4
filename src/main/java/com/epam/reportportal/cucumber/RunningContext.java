@@ -202,16 +202,14 @@ class RunningContext {
         void processScenarioOutline(ScenarioDefinition scenarioOutline) {
             if (isScenarioOutline(scenarioOutline)) {
                 String scenarioAbsoluteName = scenarioDesignation.replaceAll(":\\d+", "");
-                synchronized (OUTLINE_SYNC) {
-                    scenarioOutlineMap.computeIfAbsent(
-                            scenarioAbsoluteName,
-                            k -> ((ScenarioOutline) scenarioOutline).getExamples()
-                                    .stream()
-                                    .flatMap(e -> e.getTableBody().stream())
-                                    .map(r -> r.getLocation().getLine())
-                                    .collect(Collectors.toList())
-                    );
-                }
+                scenarioOutlineMap.computeIfAbsent(
+                        scenarioAbsoluteName,
+                        k -> ((ScenarioOutline) scenarioOutline).getExamples()
+                                .stream()
+                                .flatMap(e -> e.getTableBody().stream())
+                                .map(r -> r.getLocation().getLine())
+                                .collect(Collectors.toList())
+                );
                 int iterationIdx = IntStream.range(0, scenarioOutlineMap.get(scenarioAbsoluteName).size())
                         .filter(i -> getLine() == scenarioOutlineMap.get(scenarioAbsoluteName).get(i))
                         .findFirst()
