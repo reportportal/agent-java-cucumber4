@@ -24,11 +24,27 @@ import gherkin.AstBuilder;
 import gherkin.Parser;
 import gherkin.ParserException;
 import gherkin.TokenMatcher;
-import gherkin.ast.*;
+import gherkin.ast.Background;
+import gherkin.ast.Examples;
+import gherkin.ast.Feature;
+import gherkin.ast.GherkinDocument;
+import gherkin.ast.ScenarioDefinition;
+import gherkin.ast.ScenarioOutline;
+import gherkin.ast.Step;
+import gherkin.ast.TableRow;
 import gherkin.pickles.PickleTag;
 import io.reactivex.Maybe;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Running context that contains mostly manipulations with Gherkin objects.
@@ -61,11 +77,11 @@ class RunningContext {
         ScenarioContext getScenarioContext(TestCase testCase) {
             ScenarioDefinition scenario = getScenario(testCase);
             ScenarioContext context = new ScenarioContext();
+            context.processTags(testCase.getTags());
             context.processScenario(scenario);
             context.setTestCase(testCase);
             context.processBackground(getBackground());
             context.processScenarioOutline(scenario);
-            context.processTags(testCase.getTags());
             return context;
         }
 
@@ -141,7 +157,8 @@ class RunningContext {
     }
 
     static class ScenarioContext {
-        private static Map<String, String> outlineIterationsMap = new HashMap<String, String>();
+        private final static Object OUTLINE_SYNC = new Object();
+        private static Map<String, List<Integer>> scenarioOutlineMap = new ConcurrentHashMap<>();
         private Maybe<String> id = null;
         private Background background;
         private ScenarioDefinition scenario;
@@ -151,6 +168,7 @@ class RunningContext {
         private TestCase testCase;
         private boolean hasBackground = false;
         private String scenarioDesignation;
+        private String outlineIteration;
 
         ScenarioContext() {
             backgroundSteps = new ArrayDeque<Step>();
@@ -179,12 +197,27 @@ class RunningContext {
         }
 
         /**
-         * Takes line in feature file for scenario number identification
+         * Takes the serial number of scenario outline and links it to the executing scenario
          **/
-        void processScenarioOutline(ScenarioDefinition scenarioDefinition) {
-            if (isScenarioOutline(scenarioDefinition) && !hasOutlineSteps()) {
-                String outlineIdentifier = " [" + scenarioDesignation.replaceAll(".*\\.feature:|\\ #.*", "") + "]";
-                outlineIterationsMap.put(scenarioDesignation, outlineIdentifier);
+        void processScenarioOutline(ScenarioDefinition scenarioOutline) {
+            if (isScenarioOutline(scenarioOutline)) {
+                String scenarioAbsoluteName = scenarioDesignation.replaceAll(":\\d+", "");
+                scenarioOutlineMap.computeIfAbsent(
+                        scenarioAbsoluteName,
+                        k -> ((ScenarioOutline) scenarioOutline).getExamples()
+                                .stream()
+                                .flatMap(e -> e.getTableBody().stream())
+                                .map(r -> r.getLocation().getLine())
+                                .collect(Collectors.toList())
+                );
+                int iterationIdx = IntStream.range(0, scenarioOutlineMap.get(scenarioAbsoluteName).size())
+                        .filter(i -> getLine() == scenarioOutlineMap.get(scenarioAbsoluteName).get(i))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException(String.format(
+                                "No outline iteration number found for scenario %s",
+                                scenarioDesignation
+                        )));
+                outlineIteration = String.format("[%d]", iterationIdx + 1);
             }
         }
 
@@ -258,12 +291,8 @@ class RunningContext {
             return hasBackground && background != null;
         }
 
-        boolean hasOutlineSteps() {
-            return outlineIterationsMap.get(scenarioDesignation) != null && !outlineIterationsMap.get(scenarioDesignation).isEmpty();
-        }
-
         String getOutlineIteration() {
-            return hasOutlineSteps() ? outlineIterationsMap.get(scenarioDesignation) : null;
+            return outlineIteration;
         }
     }
 }
