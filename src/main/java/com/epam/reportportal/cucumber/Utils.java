@@ -205,7 +205,7 @@ public class Utils {
 	}
 
     /**
-     * Map Cucumber statuses to RP log levels
+     * Map Cucumber statuses to RP item statuses
      *
      * @param status - Cucumber status
      * @return RP test item status and null if status is null
