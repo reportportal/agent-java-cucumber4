@@ -49,7 +49,7 @@ import java.util.List;
 public class StepReporter extends AbstractReporter {
 	private Maybe<String> currentStepId;
 	private Maybe<String> hookStepId;
-	private String hookStatus;
+	private  Result.Type hookStatus;
 
 	public StepReporter() {
 		super();
@@ -86,7 +86,7 @@ public class StepReporter extends AbstractReporter {
 	@Override
 	protected void afterStep(Result result) {
 		reportResult(result, null);
-		Utils.finishTestItem(launch.get(), currentStepId, result.getStatus().toString().toUpperCase());
+		Utils.finishTestItem(launch.get(), currentStepId, result.getStatus());
 		currentStepId = null;
 	}
 
@@ -118,7 +118,7 @@ public class StepReporter extends AbstractReporter {
 		rq.setStartTime(Calendar.getInstance().getTime());
 
 		hookStepId = launch.get().startTestItem(getCurrentScenarioContext().getId(), rq);
-		hookStatus = Statuses.PASSED;
+		hookStatus = Result.Type.PASSED;
 	}
 
 	@Override
@@ -130,7 +130,7 @@ public class StepReporter extends AbstractReporter {
 	@Override
 	protected void hookFinished(HookTestStep step, Result result, Boolean isBefore) {
 		reportResult(result, (isBefore ? "Before" : "After") + " hook: " + step.getCodeLocation());
-		hookStatus = result.getStatus().toString();
+		hookStatus = result.getStatus();
 	}
 
 	@Override
