@@ -155,7 +155,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		for (Map.Entry<Pair<String, String>, RunningContext.ScenarioContext> scenarioContext : currentScenarioContextMap.entrySet()) {
 			if (scenarioContext.getValue().getLine() == currentScenarioContext.getLine()) {
 				currentScenarioContextMap.remove(scenarioContext.getKey());
-				Date endTime = Utils.finishTestItem(launch.get(), currentScenarioContext.getId(), event.result.getStatus().toString());
+				Date endTime = Utils.finishTestItem(launch.get(), currentScenarioContext.getId(), event.result.getStatus());
 				String featureURI = scenarioContext.getKey().getValue();
 				featureEndTime.put(featureURI, endTime);
 				break;
