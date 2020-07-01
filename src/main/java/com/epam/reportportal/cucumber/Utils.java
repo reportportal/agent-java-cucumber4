@@ -17,7 +17,7 @@ package com.epam.reportportal.cucumber;
 
 import com.epam.reportportal.annotations.TestCaseId;
 import com.epam.reportportal.annotations.attribute.Attributes;
-import com.epam.reportportal.listeners.Statuses;
+import com.epam.reportportal.listeners.ItemStatus;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.item.TestCaseIdEntry;
@@ -31,10 +31,16 @@ import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
 import cucumber.api.HookTestStep;
 import cucumber.api.PickleStepTestStep;
+import cucumber.api.Result;
 import cucumber.api.TestStep;
 import cucumber.runtime.StepDefinitionMatch;
 import gherkin.ast.Tag;
-import gherkin.pickles.*;
+import gherkin.pickles.Argument;
+import gherkin.pickles.PickleCell;
+import gherkin.pickles.PickleRow;
+import gherkin.pickles.PickleString;
+import gherkin.pickles.PickleTable;
+import gherkin.pickles.PickleTag;
 import io.reactivex.Maybe;
 import io.reactivex.annotations.Nullable;
 import org.slf4j.Logger;
@@ -46,7 +52,13 @@ import rp.com.google.common.collect.Lists;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -81,11 +93,14 @@ public class Utils {
 	}
 
 	//@formatter:off
-    private static final Map<String, String> STATUS_MAPPING = ImmutableMap.<String, String>builder()
-            .put(PASSED, Statuses.PASSED)
-            .put(SKIPPED, Statuses.SKIPPED)
-            //TODO replace with NOT_IMPLEMENTED in future
-            .put("undefined", Statuses.SKIPPED).build();
+    private static final Map<Result.Type, ItemStatus> STATUS_MAPPING = ImmutableMap.<Result.Type, ItemStatus>builder()
+            .put(Result.Type.PASSED, ItemStatus.PASSED)
+            .put(Result.Type.FAILED, ItemStatus.FAILED)
+            .put(Result.Type.SKIPPED, ItemStatus.SKIPPED)
+            .put(Result.Type.PENDING, ItemStatus.SKIPPED)
+            .put(Result.Type.AMBIGUOUS, ItemStatus.SKIPPED)
+            .put(Result.Type.UNDEFINED, ItemStatus.SKIPPED)
+            .put(Result.Type.UNUSED, ItemStatus.SKIPPED).build();
     //@formatter:on
 
 	static void finishFeature(Launch rp, Maybe<String> itemId, Date dateTime) {
@@ -102,7 +117,7 @@ public class Utils {
 		finishTestItem(rp, itemId, null);
 	}
 
-	static Date finishTestItem(Launch rp, Maybe<String> itemId, String status) {
+	static Date finishTestItem(Launch rp, Maybe<String> itemId, Result.Type status) {
 		if (itemId == null) {
 			LOGGER.error("BUG: Trying to finish unspecified test item.");
 			return null;
@@ -110,7 +125,7 @@ public class Utils {
 		FinishTestItemRQ rq = new FinishTestItemRQ();
 		Date endTime = Calendar.getInstance().getTime();
 		rq.setEndTime(endTime);
-		rq.setStatus(status);
+		rq.setStatus(mapItemStatus(status));
 		rp.finishTestItem(itemId, rq);
 		return endTime;
 	}
@@ -188,6 +203,24 @@ public class Utils {
 		}
 		return mapped;
 	}
+
+    /**
+     * Map Cucumber statuses to RP item statuses
+     *
+     * @param status - Cucumber status
+     * @return RP test item status and null if status is null
+     */
+    static String mapItemStatus(Result.Type status) {
+        if (status == null) {
+            return null;
+        } else {
+            if (STATUS_MAPPING.get(status) == null) {
+                LOGGER.error(String.format("Unable to find direct mapping between Cucumber and ReportPortal for TestItem with status: '%s'.", status));
+                return ItemStatus.SKIPPED.name();
+            }
+            return STATUS_MAPPING.get(status).name();
+        }
+    }
 
 	/**
 	 * Generate name representation
