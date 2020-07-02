@@ -157,8 +157,7 @@ class RunningContext {
     }
 
     static class ScenarioContext {
-        private final static Object OUTLINE_SYNC = new Object();
-        private static Map<String, List<Integer>> scenarioOutlineMap = new ConcurrentHashMap<>();
+        private static Map<ScenarioDefinition, List<Integer>> scenarioOutlineMap = new ConcurrentHashMap<>();
         private Maybe<String> id = null;
         private Background background;
         private ScenarioDefinition scenario;
@@ -201,17 +200,16 @@ class RunningContext {
          **/
         void processScenarioOutline(ScenarioDefinition scenarioOutline) {
             if (isScenarioOutline(scenarioOutline)) {
-                String scenarioAbsoluteName = scenarioDesignation.replaceAll(":\\d+", "");
                 scenarioOutlineMap.computeIfAbsent(
-                        scenarioAbsoluteName,
+                        scenarioOutline,
                         k -> ((ScenarioOutline) scenarioOutline).getExamples()
                                 .stream()
                                 .flatMap(e -> e.getTableBody().stream())
                                 .map(r -> r.getLocation().getLine())
                                 .collect(Collectors.toList())
                 );
-                int iterationIdx = IntStream.range(0, scenarioOutlineMap.get(scenarioAbsoluteName).size())
-                        .filter(i -> getLine() == scenarioOutlineMap.get(scenarioAbsoluteName).get(i))
+                int iterationIdx = IntStream.range(0, scenarioOutlineMap.get(scenarioOutline).size())
+                        .filter(i -> getLine() == scenarioOutlineMap.get(scenarioOutline).get(i))
                         .findFirst()
                         .orElseThrow(() -> new IllegalStateException(String.format(
                                 "No outline iteration number found for scenario %s",
