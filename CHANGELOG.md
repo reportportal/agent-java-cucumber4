@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+
+## [5.0.0-BETA-13]
 ### Fixed
 - Issue #61: Screenshots aren't displayed for failed UI tests due to missing content type of the file has been sent
 
