@@ -293,8 +293,9 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 			LOGGER.warn("Mime-type not found", e);
 			embeddingName = "embedding";
 		}
-		file.setName(embeddingName);
+		file.setName(UUID.randomUUID().toString());
 		file.setContent(data);
+		file.setContentType(embeddingName);
 		Utils.sendLog(embeddingName, "UNKNOWN", file);
 	}
 
