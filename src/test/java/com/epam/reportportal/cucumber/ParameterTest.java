@@ -90,7 +90,8 @@ public class ParameterTest {
 		stepReporter.beforeStep(testStep);
 
 		ArgumentCaptor<StartTestItemRQ> startTestItemRQArgumentCaptor = ArgumentCaptor.forClass(StartTestItemRQ.class);
-		verify(reportPortalClient, times(1)).startTestItem(anyString(), startTestItemRQArgumentCaptor.capture());
+		verify(reportPortalClient,
+				timeout(1000).times(1)).startTestItem(anyString(), startTestItemRQArgumentCaptor.capture());
 
 		StartTestItemRQ request = startTestItemRQArgumentCaptor.getValue();
 		assertNotNull(request);
