@@ -18,6 +18,12 @@ on:
     branches:
       - master
       - v4-hotfix
+    paths-ignore:
+      - '.github/**'
+      - README.md
+      - README_TEMPLATE.md
+      - gradle.properties
+      - CHANGELOG.md
 
 env:
   VERSION_FILE: gradle.properties
