@@ -18,6 +18,7 @@ on:
     branches:
       - master
       - v4-hotfix
+
     paths-ignore:
       - '.github/**'
       - README.md
