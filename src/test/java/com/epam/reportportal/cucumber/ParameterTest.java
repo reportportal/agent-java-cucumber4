@@ -1,31 +1,33 @@
 package com.epam.reportportal.cucumber;
 
+import com.epam.reportportal.cucumber.integration.TestScenarioReporter;
+import com.epam.reportportal.cucumber.integration.TestStepReporter;
+import com.epam.reportportal.cucumber.integration.util.TestUtils;
 import com.epam.reportportal.listeners.ListenerParameters;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.ReportPortalClient;
+import com.epam.reportportal.util.test.CommonUtils;
+import com.epam.ta.reportportal.ws.model.ParameterResource;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
-import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
-import com.epam.ta.reportportal.ws.model.launch.StartLaunchRS;
-import cucumber.api.Argument;
-import cucumber.api.PickleStepTestStep;
-import gherkin.ast.Location;
-import gherkin.ast.Step;
-import gherkin.pickles.PickleStep;
-import io.reactivex.Maybe;
-import org.junit.Before;
-import org.junit.Test;
+import io.cucumber.testng.AbstractTestNGCucumberTests;
+import io.cucumber.testng.CucumberOptions;
+import org.apache.commons.lang3.tuple.Pair;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import rp.com.google.common.collect.Lists;
 
-import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
-import static org.junit.Assert.*;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.*;
 
 /**
@@ -33,91 +35,92 @@ import static org.mockito.Mockito.*;
  */
 public class ParameterTest {
 
-	private TestStepReporter stepReporter;
+	@CucumberOptions(features = "src/test/resources/features/BasicScenarioOutlineParameters.feature", glue = {
+			"com.epam.reportportal.cucumber.integration.feature" }, plugin = { "pretty",
+			"com.epam.reportportal.cucumber.integration.TestStepReporter" })
+	public static class RunOutlineParametersTestStepReporter extends AbstractTestNGCucumberTests {
 
-	@Mock
-	private ReportPortalClient reportPortalClient;
+	}
 
-	@Mock
-	private ListenerParameters listenerParameters;
+	@CucumberOptions(features = "src/test/resources/features/TwoScenarioOutlineParameters.feature", glue = {
+			"com.epam.reportportal.cucumber.integration.feature" }, plugin = { "pretty",
+			"com.epam.reportportal.cucumber.integration.TestStepReporter" })
+	public static class RunTwoOutlineParametersTestStepReporter extends AbstractTestNGCucumberTests {
 
-	@Mock
-	private PickleStepTestStep testStep;
+	}
 
-	@Before
+	private final String launchId = CommonUtils.namedId("launch_");
+	private final String suiteId = CommonUtils.namedId("suite_");
+	private final List<String> testIds = Stream.generate(() -> CommonUtils.namedId("test_")).limit(3).collect(Collectors.toList());
+	private final List<Pair<String, ? extends Collection<String>>> tests = testIds.stream()
+			.map(id -> Pair.of(id, Stream.generate(() -> CommonUtils.namedId("step_")).limit(3).collect(Collectors.toList())))
+			.collect(Collectors.toList());
+
+	private final ListenerParameters parameters = TestUtils.standardParameters();
+	private final ReportPortalClient client = mock(ReportPortalClient.class);
+	private final ExecutorService executorService = Executors.newSingleThreadExecutor();
+	private final ReportPortal reportPortal = ReportPortal.create(client, parameters, executorService);
+
+	@BeforeEach
 	public void initLaunch() {
-		MockitoAnnotations.initMocks(this);
-		when(listenerParameters.getEnable()).thenReturn(true);
-		when(listenerParameters.getBaseUrl()).thenReturn("http://example.com");
-		when(listenerParameters.getIoPoolSize()).thenReturn(10);
-		when(listenerParameters.getBatchLogsSize()).thenReturn(5);
-		stepReporter = new TestStepReporter() {
-			@Override
-			protected ReportPortal buildReportPortal() {
-				return ReportPortal.create(reportPortalClient, listenerParameters);
-			}
-		};
+		TestUtils.mockLaunch(client, launchId, suiteId, tests);
+		TestScenarioReporter.RP.set(reportPortal);
+		TestStepReporter.RP.set(reportPortal);
+	}
 
+	public static final List<Pair<String, Object>> PARAMETERS = Arrays.asList(
+			Pair.of("str", "\"first\""), Pair.of("parameters", 123),
+			Pair.of("str", "\"second\""), Pair.of("parameters", 12345),
+			Pair.of("str", "\"third\""), Pair.of("parameters", 12345678)
+	);
+
+	@Test
+	public void verify_agent_retrieves_parameters_from_request() {
+		TestUtils.runTests(RunOutlineParametersTestStepReporter.class);
+
+		verify(client, times(1)).startTestItem(any());
+		verify(client, times(3)).startTestItem(same(suiteId), any());
+		ArgumentCaptor<StartTestItemRQ> captor = ArgumentCaptor.forClass(StartTestItemRQ.class);
+		verify(client, times(3)).startTestItem(same(testIds.get(0)), captor.capture());
+		verify(client, times(3)).startTestItem(same(testIds.get(1)), captor.capture());
+		verify(client, times(3)).startTestItem(same(testIds.get(2)), captor.capture());
+
+		List<StartTestItemRQ> items = captor.getAllValues();
+		List<StartTestItemRQ> filteredItems = IntStream.range(0, items.size())
+				.filter(i -> i % 3 != 0)
+				.mapToObj(items::get)
+				.collect(Collectors.toList());
+		IntStream.range(0, filteredItems.size()).mapToObj(i -> Pair.of(i, filteredItems.get(i))).forEach(e -> {
+			assertThat(e.getValue().getParameters(), allOf(notNullValue(), hasSize(1)));
+			ParameterResource param = e.getValue().getParameters().get(0);
+			Pair<String, Object> expectedParam = PARAMETERS.get(e.getKey());
+
+			assertThat(param.getKey(), equalTo(expectedParam.getKey()));
+			assertThat(param.getValue(), equalTo(expectedParam.getValue().toString()));
+		});
 	}
 
 	@Test
-	public void verifyClientRetrievesParametersFromRequest() {
-		when(reportPortalClient.startLaunch(any(StartLaunchRQ.class))).then(t -> Maybe.create(emitter -> {
-			StartLaunchRS rs = new StartLaunchRS();
-			rs.setId("launchId");
-			emitter.onSuccess(rs);
-			emitter.onComplete();
-		}).cache());
+	public void verify_agent_retrieves_two_parameters_from_request() {
+		TestUtils.runTests(RunTwoOutlineParametersTestStepReporter.class);
 
-		stepReporter.beforeLaunch();
+		verify(client, times(1)).startTestItem(any());
+		verify(client, times(3)).startTestItem(same(suiteId), any());
+		ArgumentCaptor<StartTestItemRQ> captor = ArgumentCaptor.forClass(StartTestItemRQ.class);
+		verify(client, times(3)).startTestItem(same(testIds.get(0)), captor.capture());
+		verify(client, times(3)).startTestItem(same(testIds.get(1)), captor.capture());
+		verify(client, times(3)).startTestItem(same(testIds.get(2)), captor.capture());
 
-		ArrayList<String> parameterValues = Lists.newArrayList("1", "parameter");
-		ArrayList<String> parameterNames = Lists.newArrayList("count", "item");
-
-		when(testStep.getPickleStep()).thenReturn(new PickleStep("test with parameters", Collections.emptyList(), Collections.emptyList()));
-		when(testStep.getDefinitionArgument()).thenReturn(parameterValues.stream().map(this::getArgument).collect(Collectors.toList()));
-		when(stepReporter.scenarioContext.getId()).thenReturn(Maybe.create(emitter -> {
-			emitter.onSuccess("scenarioId");
-			emitter.onComplete();
-		}));
-		when(stepReporter.scenarioContext.getStep(testStep)).thenReturn(new Step(new Location(1, 1),
-				"keyword",
-				String.format("test with parameters <%s>", String.join("> <", parameterNames)),
-				null
-		));
-		when(stepReporter.scenarioContext.getStepPrefix()).thenReturn("");
-
-		stepReporter.beforeStep(testStep);
-
-		ArgumentCaptor<StartTestItemRQ> startTestItemRQArgumentCaptor = ArgumentCaptor.forClass(StartTestItemRQ.class);
-		verify(reportPortalClient,
-				timeout(1000).times(1)).startTestItem(anyString(), startTestItemRQArgumentCaptor.capture());
-
-		StartTestItemRQ request = startTestItemRQArgumentCaptor.getValue();
-		assertNotNull(request);
-		assertNotNull(request.getParameters());
-		assertEquals(2, request.getParameters().size());
-		assertTrue(request.getParameters()
-				.stream()
-				.allMatch(it -> parameterValues.contains(it.getValue()) && parameterNames.contains(it.getKey())));
-	}
-
-	private Argument getArgument(String it) {
-		return new Argument() {
-			@Override
-			public String getValue() {
-				return it;
-			}
-
-			@Override
-			public int getStart() {
-				return 0;
-			}
-
-			@Override
-			public int getEnd() {
-				return 0;
-			}
-		};
+		List<StartTestItemRQ> items = captor.getAllValues();
+		List<StartTestItemRQ> twoParameterItems = IntStream.range(0, items.size())
+				.filter(i -> i % 3 == 0)
+				.mapToObj(items::get)
+				.collect(Collectors.toList());
+		List<StartTestItemRQ> oneParameterItems = IntStream.range(0, items.size())
+				.filter(i -> i % 3 == 2)
+				.mapToObj(items::get)
+				.collect(Collectors.toList());
+		twoParameterItems.forEach(i -> assertThat(i.getParameters(), allOf(notNullValue(), hasSize(2))));
+		oneParameterItems.forEach(i -> assertThat(i.getParameters(), allOf(notNullValue(), hasSize(1))));
 	}
 }
