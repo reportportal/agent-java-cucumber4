@@ -47,7 +47,7 @@ class RunningContext {
 	}
 
 	static class FeatureContext {
-		private static final Map<String, TestSourceRead> PATH_TO_READ_EVENT_MAP = new HashMap<>();
+		private static final Map<String, TestSourceRead> PATH_TO_READ_EVENT_MAP = new ConcurrentHashMap<>();
 		private String currentFeatureUri;
 		private Maybe<String> currentFeatureId;
 		private Feature currentFeature;
