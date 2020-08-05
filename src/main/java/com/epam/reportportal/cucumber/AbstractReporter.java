@@ -35,7 +35,11 @@ import org.slf4j.LoggerFactory;
 import rp.com.google.common.base.Supplier;
 import rp.com.google.common.base.Suppliers;
 
-import java.util.*;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static com.epam.reportportal.cucumber.Utils.getCodeRef;
 import static com.epam.reportportal.cucumber.Utils.getDescription;
@@ -53,25 +57,21 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 
 	private static final String AGENT_PROPERTIES_FILE = "agent.properties";
 
-    protected Supplier<Launch> launch;
+	protected Supplier<Launch> launch;
 	static final String COLON_INFIX = ": ";
 	private static final String SKIPPED_ISSUE_KEY = "skippedIssue";
 	private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReporter.class);
 
-	private Map<String, RunningContext.FeatureContext> currentFeatureContextMap = Collections.synchronizedMap(new HashMap<String, RunningContext.FeatureContext>());
+	private final Map<String, RunningContext.FeatureContext> currentFeatureContextMap = new ConcurrentHashMap<>();
 
-	private Map<Pair<String, String>, RunningContext.ScenarioContext> currentScenarioContextMap = Collections.synchronizedMap(new HashMap<Pair<String, String>, RunningContext.ScenarioContext>());
+	private final Map<Pair<String, String>, RunningContext.ScenarioContext> currentScenarioContextMap = new ConcurrentHashMap<>();
 
-	private Map<Long, RunningContext.ScenarioContext> threadCurrentScenarioContextMap = Collections.synchronizedMap(new HashMap<Long, RunningContext.ScenarioContext>());
+	private final Map<Long, RunningContext.ScenarioContext> threadCurrentScenarioContextMap = new ConcurrentHashMap<>();
 
 	// There is no event for recognizing end of feature in Cucumber.
 	// This map is used to record the last scenario time and its feature uri.
 	// End of feature occurs once launch is finished.
-	private Map<String, Date> featureEndTime = Collections.synchronizedMap(new HashMap<String, Date>());
-
-	protected void setThreadCurrentScenarioContextMap(Map<Long, RunningContext.ScenarioContext> threadCurrentScenarioContextMap) {
-		this.threadCurrentScenarioContextMap = threadCurrentScenarioContextMap;
-	}
+	private final Map<String, Date> featureEndTime = new ConcurrentHashMap<>();
 
 	/**
 	 * Registers an event handler for a specific event.
@@ -135,8 +135,8 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	/**
 	 * Start Cucumber scenario
 	 */
-	protected void beforeScenario(RunningContext.FeatureContext currentFeatureContext, RunningContext.ScenarioContext currentScenarioContext,
-			String scenarioName) {
+	protected void beforeScenario(RunningContext.FeatureContext currentFeatureContext,
+			RunningContext.ScenarioContext currentScenarioContext, String scenarioName) {
 		String description = getDescription(currentFeatureContext.getUri());
 		String codeRef = getCodeRef(currentFeatureContext.getUri(), currentScenarioContext.getLine());
 		Maybe<String> id = Utils.startNonLeafNode(
@@ -166,18 +166,6 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 				break;
 			}
 		}
-	}
-
-	/**
-	 * It's essential to operate with feature URI,
-	 * to prevent problems with the same feature names in different folders/packages
-	 */
-    protected String buildFeatureNode(TestCase testCase) {
-		RunningContext.FeatureContext featureContext = new RunningContext.FeatureContext().processTestSourceReadEvent(testCase);
-		String featureKeyword = featureContext.getFeature().getKeyword();
-		String featureName = featureContext.getFeature().getName();
-		Utils.buildNodeName(featureKeyword, AbstractReporter.COLON_INFIX, featureName, null);
-		return featureContext.getUri();
 	}
 
 	/**
@@ -318,86 +306,43 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 * Private part that responsible for handling events
 	 */
 
-    protected EventHandler<TestRunStarted> getTestRunStartedHandler() {
-		return new EventHandler<TestRunStarted>() {
-			@Override
-			public void receive(TestRunStarted event) {
-				beforeLaunch();
-			}
+	protected EventHandler<TestRunStarted> getTestRunStartedHandler() {
+		return event -> beforeLaunch();
+	}
+
+	protected EventHandler<TestSourceRead> getTestSourceReadHandler() {
+		return event -> RunningContext.FeatureContext.addTestSourceReadEvent(event.uri, event);
+	}
+
+	protected EventHandler<TestCaseStarted> getTestCaseStartedHandler() {
+		return this::handleStartOfTestCase;
+	}
+
+	protected EventHandler<TestStepStarted> getTestStepStartedHandler() {
+		return this::handleTestStepStarted;
+	}
+
+	protected EventHandler<TestStepFinished> getTestStepFinishedHandler() {
+		return this::handleTestStepFinished;
+	}
+
+	protected EventHandler<TestCaseFinished> getTestCaseFinishedHandler() {
+		return this::afterScenario;
+	}
+
+	protected EventHandler<TestRunFinished> getTestRunFinishedHandler() {
+		return event -> {
+			handleEndOfFeature();
+			afterLaunch();
 		};
 	}
 
-    protected EventHandler<TestSourceRead> getTestSourceReadHandler() {
-		return new EventHandler<TestSourceRead>() {
-			@Override
-			public void receive(TestSourceRead event) {
-				RunningContext.FeatureContext.addTestSourceReadEvent(event.uri, event);
-			}
-		};
+	protected EventHandler<EmbedEvent> getEmbedEventHandler() {
+		return event -> embedding(event.mimeType, event.data);
 	}
 
-    protected EventHandler<TestCaseStarted> getTestCaseStartedHandler() {
-		return new EventHandler<TestCaseStarted>() {
-			@Override
-			public void receive(TestCaseStarted event) {
-				handleStartOfTestCase(event);
-			}
-		};
-	}
-
-    protected EventHandler<TestStepStarted> getTestStepStartedHandler() {
-		return new EventHandler<TestStepStarted>() {
-			@Override
-			public void receive(TestStepStarted event) {
-				handleTestStepStarted(event);
-			}
-		};
-	}
-
-    protected EventHandler<TestStepFinished> getTestStepFinishedHandler() {
-		return new EventHandler<TestStepFinished>() {
-			@Override
-			public void receive(TestStepFinished event) {
-				handleTestStepFinished(event);
-			}
-		};
-	}
-
-    protected EventHandler<TestCaseFinished> getTestCaseFinishedHandler() {
-		return new EventHandler<TestCaseFinished>() {
-			@Override
-			public void receive(TestCaseFinished event) {
-				afterScenario(event);
-			}
-		};
-	}
-
-    protected EventHandler<TestRunFinished> getTestRunFinishedHandler() {
-		return new EventHandler<TestRunFinished>() {
-			@Override
-			public void receive(TestRunFinished event) {
-				handleEndOfFeature();
-				afterLaunch();
-			}
-		};
-	}
-
-    protected EventHandler<EmbedEvent> getEmbedEventHandler() {
-		return new EventHandler<EmbedEvent>() {
-			@Override
-			public void receive(EmbedEvent event) {
-				embedding(event.mimeType, event.data);
-			}
-		};
-	}
-
-    protected EventHandler<WriteEvent> getWriteEventHandler() {
-		return new EventHandler<WriteEvent>() {
-			@Override
-			public void receive(WriteEvent event) {
-				write(event.text);
-			}
-		};
+	protected EventHandler<WriteEvent> getWriteEventHandler() {
+		return event -> write(event.text);
 	}
 
 	protected void handleEndOfFeature() {
@@ -410,10 +355,11 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 
 	protected void handleStartOfTestCase(TestCaseStarted event) {
 		TestCase testCase = event.testCase;
-		String featureURI = buildFeatureNode(testCase);
-		RunningContext.FeatureContext currentFeatureContext = currentFeatureContextMap.get(featureURI);
+		RunningContext.FeatureContext featureContext = new RunningContext.FeatureContext().processTestSourceReadEvent(testCase);
+		String featureUri = featureContext.getUri();
+		RunningContext.FeatureContext currentFeatureContext = currentFeatureContextMap.get(featureUri);
 
-		currentFeatureContext = currentFeatureContext == null ? createFeatureContext(testCase, featureURI) : currentFeatureContext;
+		currentFeatureContext = currentFeatureContext == null ? createFeatureContext(testCase, featureUri) : currentFeatureContext;
 
 		if (!currentFeatureContext.getUri().equals(testCase.getUri())) {
 			throw new IllegalStateException("Scenario URI does not match Feature URI.");

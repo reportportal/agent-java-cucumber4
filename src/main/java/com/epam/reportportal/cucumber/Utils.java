@@ -35,12 +35,7 @@ import cucumber.api.Result;
 import cucumber.api.TestStep;
 import cucumber.runtime.StepDefinitionMatch;
 import gherkin.ast.Tag;
-import gherkin.pickles.Argument;
-import gherkin.pickles.PickleCell;
-import gherkin.pickles.PickleRow;
-import gherkin.pickles.PickleString;
-import gherkin.pickles.PickleTable;
-import gherkin.pickles.PickleTag;
+import gherkin.pickles.*;
 import io.reactivex.Maybe;
 import io.reactivex.annotations.Nullable;
 import org.slf4j.Logger;
@@ -53,13 +48,7 @@ import javax.annotation.Nonnull;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -144,19 +133,16 @@ public class Utils {
 	}
 
 	static void sendLog(final String message, final String level, final File file) {
-		ReportPortal.emitLog(new Function<String, SaveLogRQ>() {
-			@Override
-			public SaveLogRQ apply(String itemUuid) {
-				SaveLogRQ rq = new SaveLogRQ();
-				rq.setMessage(message);
-				rq.setItemUuid(itemUuid);
-				rq.setLevel(level);
-				rq.setLogTime(Calendar.getInstance().getTime());
-				if (file != null) {
-					rq.setFile(file);
-				}
-				return rq;
+		ReportPortal.emitLog((Function<String, SaveLogRQ>) itemUuid -> {
+			SaveLogRQ rq = new SaveLogRQ();
+			rq.setMessage(message);
+			rq.setItemUuid(itemUuid);
+			rq.setLevel(level);
+			rq.setLogTime(Calendar.getInstance().getTime());
+			if (file != null) {
+				rq.setFile(file);
 			}
+			return rq;
 		});
 	}
 
@@ -167,11 +153,7 @@ public class Utils {
 	 * @return set of tags
 	 */
 	static Set<ItemAttributesRQ> extractPickleTags(List<PickleTag> tags) {
-		Set<ItemAttributesRQ> attributes = new HashSet<ItemAttributesRQ>();
-		for (PickleTag tag : tags) {
-			attributes.add(new ItemAttributesRQ(null, tag.getName()));
-		}
-		return attributes;
+		return tags.stream().map(t -> new ItemAttributesRQ(null, t.getName())).collect(Collectors.toSet());
 	}
 
 	/**
@@ -181,7 +163,7 @@ public class Utils {
 	 * @return set of tags
 	 */
 	public static Set<ItemAttributesRQ> extractAttributes(List<Tag> tags) {
-		Set<ItemAttributesRQ> attributes = new HashSet<ItemAttributesRQ>();
+		Set<ItemAttributesRQ> attributes = new HashSet<>();
 		for (Tag tag : tags) {
 			attributes.add(new ItemAttributesRQ(null, tag.getName()));
 		}
@@ -206,23 +188,25 @@ public class Utils {
 		return mapped;
 	}
 
-    /**
-     * Map Cucumber statuses to RP item statuses
-     *
-     * @param status - Cucumber status
-     * @return RP test item status and null if status is null
-     */
-    static String mapItemStatus(Result.Type status) {
-        if (status == null) {
-            return null;
-        } else {
-            if (STATUS_MAPPING.get(status) == null) {
-                LOGGER.error(String.format("Unable to find direct mapping between Cucumber and ReportPortal for TestItem with status: '%s'.", status));
-                return ItemStatus.SKIPPED.name();
-            }
-            return STATUS_MAPPING.get(status).name();
-        }
-    }
+	/**
+	 * Map Cucumber statuses to RP item statuses
+	 *
+	 * @param status - Cucumber status
+	 * @return RP test item status and null if status is null
+	 */
+	static String mapItemStatus(Result.Type status) {
+		if (status == null) {
+			return null;
+		} else {
+			if (STATUS_MAPPING.get(status) == null) {
+				LOGGER.error(String.format("Unable to find direct mapping between Cucumber and ReportPortal for TestItem with status: '%s'.",
+						status
+				));
+				return ItemStatus.SKIPPED.name();
+			}
+			return STATUS_MAPPING.get(status).name();
+		}
+	}
 
 	/**
 	 * Generate name representation
@@ -338,7 +322,8 @@ public class Utils {
 				return ofNullable(testCaseIdAnnotation).flatMap(annotation -> ofNullable(getTestCaseId(testCaseIdAnnotation,
 						method,
 						((PickleStepTestStep) testStep).getDefinitionArgument()
-				))).orElseGet(() -> getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument()));
+				)))
+						.orElseGet(() -> getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument()));
 			} catch (NoSuchFieldException | IllegalAccessException e) {
 				return getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
 			}
@@ -381,7 +366,7 @@ public class Utils {
 	@Nullable
 	private static TestCaseIdEntry getTestCaseId(TestCaseId testCaseId, Method method, List<cucumber.api.Argument> arguments) {
 		if (testCaseId.parametrized()) {
-			List<String> values = new ArrayList<String>(arguments.size());
+			List<String> values = new ArrayList<>(arguments.size());
 			for (cucumber.api.Argument argument : arguments) {
 				values.add(argument.getValue());
 			}
@@ -391,15 +376,15 @@ public class Utils {
 		}
 	}
 
+	private static final Function<List<cucumber.api.Argument>, String> TRANSFORM_PARAMETERS = args -> ofNullable(args).map(a -> a.stream()
+			.map(cucumber.api.Argument::getValue)
+			.collect(Collectors.joining(",", "[", "]"))).orElse("");
+
 	private static TestCaseIdEntry getTestCaseId(String codeRef, List<cucumber.api.Argument> arguments) {
 		return ofNullable(arguments).filter(args -> !args.isEmpty())
 				.map(args -> new TestCaseIdEntry(codeRef + TRANSFORM_PARAMETERS.apply(args)))
 				.orElseGet(() -> new TestCaseIdEntry(codeRef));
 	}
-
-	private static final Function<List<cucumber.api.Argument>, String> TRANSFORM_PARAMETERS = it -> it.stream()
-			.map(cucumber.api.Argument::getValue)
-			.collect(Collectors.joining(",", "[", "]"));
 
 	private static Field getDefinitionMatchField(TestStep testStep) {
 
@@ -425,7 +410,7 @@ public class Utils {
 
 	@Nonnull
 	public static String getDescription(@Nonnull String uri) {
-		return uri.toString();
+		return uri;
 	}
 
 	@Nonnull

@@ -24,24 +24,11 @@ import gherkin.AstBuilder;
 import gherkin.Parser;
 import gherkin.ParserException;
 import gherkin.TokenMatcher;
-import gherkin.ast.Background;
-import gherkin.ast.Examples;
-import gherkin.ast.Feature;
-import gherkin.ast.GherkinDocument;
-import gherkin.ast.ScenarioDefinition;
-import gherkin.ast.ScenarioOutline;
-import gherkin.ast.Step;
-import gherkin.ast.TableRow;
+import gherkin.ast.*;
 import gherkin.pickles.PickleTag;
 import io.reactivex.Maybe;
 
-import java.util.ArrayDeque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -55,242 +42,237 @@ import java.util.stream.IntStream;
  */
 class RunningContext {
 
-    private RunningContext() {
-        throw new AssertionError("No instances should exist for the class!");
-    }
+	private RunningContext() {
+		throw new AssertionError("No instances should exist for the class!");
+	}
 
-    static class FeatureContext {
-        private static Map<String, TestSourceRead> pathToReadEventMap = new HashMap<String, TestSourceRead>();
-        private String currentFeatureUri;
-        private Maybe<String> currentFeatureId;
-        private Feature currentFeature;
-        private Set<ItemAttributesRQ> attributes;
+	static class FeatureContext {
+		private static final Map<String, TestSourceRead> PATH_TO_READ_EVENT_MAP = new HashMap<>();
+		private String currentFeatureUri;
+		private Maybe<String> currentFeatureId;
+		private Feature currentFeature;
+		private Set<ItemAttributesRQ> attributes;
 
-        FeatureContext() {
-            attributes = new HashSet<ItemAttributesRQ>();
-        }
+		FeatureContext() {
+			attributes = new HashSet<>();
+		}
 
-        static void addTestSourceReadEvent(String path, TestSourceRead event) {
-            pathToReadEventMap.put(path, event);
-        }
+		static void addTestSourceReadEvent(String path, TestSourceRead event) {
+			PATH_TO_READ_EVENT_MAP.put(path, event);
+		}
 
-        ScenarioContext getScenarioContext(TestCase testCase) {
-            ScenarioDefinition scenario = getScenario(testCase);
-            ScenarioContext context = new ScenarioContext();
-            context.processTags(testCase.getTags());
-            context.processScenario(scenario);
-            context.setTestCase(testCase);
-            context.processBackground(getBackground());
-            context.processScenarioOutline(scenario);
-            return context;
-        }
+		ScenarioContext getScenarioContext(TestCase testCase) {
+			ScenarioDefinition scenario = getScenario(testCase);
+			ScenarioContext context = new ScenarioContext();
+			context.processTags(testCase.getTags());
+			context.processScenario(scenario);
+			context.setTestCase(testCase);
+			context.processBackground(getBackground());
+			context.processScenarioOutline(scenario);
+			return context;
+		}
 
-        FeatureContext processTestSourceReadEvent(TestCase testCase) {
-            TestSourceRead event = pathToReadEventMap.get(testCase.getUri());
-            currentFeature = getFeature(event.source);
-            currentFeatureUri = event.uri;
-            attributes = Utils.extractAttributes(currentFeature.getTags());
-            return this;
-        }
+		FeatureContext processTestSourceReadEvent(TestCase testCase) {
+			TestSourceRead event = PATH_TO_READ_EVENT_MAP.get(testCase.getUri());
+			currentFeature = getFeature(event.source);
+			currentFeatureUri = event.uri;
+			attributes = Utils.extractAttributes(currentFeature.getTags());
+			return this;
+		}
 
-        Feature getFeature(String source) {
-            Parser<GherkinDocument> parser = new Parser<GherkinDocument>(new AstBuilder());
-            TokenMatcher matcher = new TokenMatcher();
-            GherkinDocument gherkinDocument;
-            try {
-                gherkinDocument = parser.parse(source, matcher);
-            } catch (ParserException e) {
-                // Ignore exceptions
-                return null;
-            }
-            return gherkinDocument.getFeature();
-        }
+		Feature getFeature(String source) {
+			Parser<GherkinDocument> parser = new Parser<>(new AstBuilder());
+			TokenMatcher matcher = new TokenMatcher();
+			GherkinDocument gherkinDocument;
+			try {
+				gherkinDocument = parser.parse(source, matcher);
+			} catch (ParserException e) {
+				// Ignore exceptions
+				return null;
+			}
+			return gherkinDocument.getFeature();
+		}
 
-        Background getBackground() {
-            ScenarioDefinition background = getFeature().getChildren().get(0);
-            return background instanceof Background ? (Background) background : null;
-        }
+		Background getBackground() {
+			ScenarioDefinition background = getFeature().getChildren().get(0);
+			return background instanceof Background ? (Background) background : null;
+		}
 
-        Feature getFeature() {
-            return currentFeature;
-        }
+		Feature getFeature() {
+			return currentFeature;
+		}
 
-        Set<ItemAttributesRQ> getAttributes() {
-            return attributes;
-        }
+		Set<ItemAttributesRQ> getAttributes() {
+			return attributes;
+		}
 
-        String getUri() {
-            return currentFeatureUri;
-        }
+		String getUri() {
+			return currentFeatureUri;
+		}
 
-        Maybe<String> getFeatureId() {
-            return currentFeatureId;
-        }
+		Maybe<String> getFeatureId() {
+			return currentFeatureId;
+		}
 
-        void setFeatureId(Maybe<String> featureId) {
-            this.currentFeatureId = featureId;
-        }
+		void setFeatureId(Maybe<String> featureId) {
+			this.currentFeatureId = featureId;
+		}
 
-        @SuppressWarnings("unchecked")
-        <T extends ScenarioDefinition> T getScenario(TestCase testCase) {
-            List<ScenarioDefinition> featureScenarios = getFeature().getChildren();
-            for (ScenarioDefinition scenario : featureScenarios) {
-                if (scenario instanceof Background) {
-                    continue;
-                }
-                if (testCase.getLine() == scenario.getLocation().getLine() && testCase.getName().equals(scenario.getName())) {
-                    return (T) scenario;
-                } else {
-                    if (scenario instanceof ScenarioOutline) {
-                        for (Examples example : ((ScenarioOutline) scenario).getExamples()) {
-                            for (TableRow tableRow : example.getTableBody()) {
-                                if (tableRow.getLocation().getLine() == testCase.getLine()) {
-                                    return (T) scenario;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            throw new IllegalStateException("Scenario can't be null!");
-        }
-    }
+		@SuppressWarnings("unchecked")
+		<T extends ScenarioDefinition> T getScenario(TestCase testCase) {
+			List<ScenarioDefinition> featureScenarios = getFeature().getChildren();
+			for (ScenarioDefinition scenario : featureScenarios) {
+				if (scenario instanceof Background) {
+					continue;
+				}
+				if (testCase.getLine() == scenario.getLocation().getLine() && testCase.getName().equals(scenario.getName())) {
+					return (T) scenario;
+				} else {
+					if (scenario instanceof ScenarioOutline) {
+						for (Examples example : ((ScenarioOutline) scenario).getExamples()) {
+							for (TableRow tableRow : example.getTableBody()) {
+								if (tableRow.getLocation().getLine() == testCase.getLine()) {
+									return (T) scenario;
+								}
+							}
+						}
+					}
+				}
+			}
+			throw new IllegalStateException("Scenario can't be null!");
+		}
+	}
 
-    static class ScenarioContext {
-        private static Map<ScenarioDefinition, List<Integer>> scenarioOutlineMap = new ConcurrentHashMap<>();
-        private Maybe<String> id = null;
-        private Background background;
-        private ScenarioDefinition scenario;
-        private Queue<Step> backgroundSteps;
-        private Map<Integer, Step> scenarioLocationMap;
-        private Set<ItemAttributesRQ> attributes;
-        private TestCase testCase;
-        private boolean hasBackground = false;
-        private String scenarioDesignation;
-        private String outlineIteration;
+	static class ScenarioContext {
+		private static final Map<ScenarioDefinition, List<Integer>> scenarioOutlineMap = new ConcurrentHashMap<>();
+		private final Queue<Step> backgroundSteps = new ArrayDeque<>();
+		private final Map<Integer, Step> scenarioLocationMap = new HashMap<>();
+		private Set<ItemAttributesRQ> attributes = new HashSet<>();
+		private Maybe<String> id = null;
+		private Background background;
+		private ScenarioDefinition scenario;
+		private TestCase testCase;
+		private boolean hasBackground = false;
+		private String scenarioDesignation;
+		private String outlineIteration;
 
-        ScenarioContext() {
-            backgroundSteps = new ArrayDeque<Step>();
-            scenarioLocationMap = new HashMap<Integer, Step>();
-            attributes = new HashSet<ItemAttributesRQ>();
-        }
+		ScenarioContext() {
+		}
 
-        void processScenario(ScenarioDefinition scenario) {
-            this.scenario = scenario;
-            for (Step step : scenario.getSteps()) {
-                scenarioLocationMap.put(step.getLocation().getLine(), step);
-            }
-        }
+		void processScenario(ScenarioDefinition scenario) {
+			this.scenario = scenario;
+			for (Step step : scenario.getSteps()) {
+				scenarioLocationMap.put(step.getLocation().getLine(), step);
+			}
+		}
 
-        void processBackground(Background background) {
-            if (background != null) {
-                this.background = background;
-                hasBackground = true;
-                backgroundSteps.addAll(background.getSteps());
-                mapBackgroundSteps(background);
-            }
-        }
+		void processBackground(Background background) {
+			if (background != null) {
+				this.background = background;
+				hasBackground = true;
+				backgroundSteps.addAll(background.getSteps());
+				mapBackgroundSteps(background);
+			}
+		}
 
-        public Set<ItemAttributesRQ> getAttributes() {
-            return attributes;
-        }
+		public Set<ItemAttributesRQ> getAttributes() {
+			return attributes;
+		}
 
-        /**
-         * Takes the serial number of scenario outline and links it to the executing scenario
-         **/
-        void processScenarioOutline(ScenarioDefinition scenarioOutline) {
-            if (isScenarioOutline(scenarioOutline)) {
-                scenarioOutlineMap.computeIfAbsent(
-                        scenarioOutline,
-                        k -> ((ScenarioOutline) scenarioOutline).getExamples()
-                                .stream()
-                                .flatMap(e -> e.getTableBody().stream())
-                                .map(r -> r.getLocation().getLine())
-                                .collect(Collectors.toList())
-                );
-                int iterationIdx = IntStream.range(0, scenarioOutlineMap.get(scenarioOutline).size())
-                        .filter(i -> getLine() == scenarioOutlineMap.get(scenarioOutline).get(i))
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalStateException(String.format(
-                                "No outline iteration number found for scenario %s",
-                                scenarioDesignation
-                        )));
-                outlineIteration = String.format("[%d]", iterationIdx + 1);
-            }
-        }
+		/**
+		 * Takes the serial number of scenario outline and links it to the executing scenario
+		 **/
+		void processScenarioOutline(ScenarioDefinition scenarioOutline) {
+			if (isScenarioOutline(scenarioOutline)) {
+				scenarioOutlineMap.computeIfAbsent(scenarioOutline,
+						k -> ((ScenarioOutline) scenarioOutline).getExamples()
+								.stream()
+								.flatMap(e -> e.getTableBody().stream())
+								.map(r -> r.getLocation().getLine())
+								.collect(Collectors.toList())
+				);
+				int iterationIdx = IntStream.range(0, scenarioOutlineMap.get(scenarioOutline).size())
+						.filter(i -> getLine() == scenarioOutlineMap.get(scenarioOutline).get(i))
+						.findFirst()
+						.orElseThrow(() -> new IllegalStateException(String.format("No outline iteration number found for scenario %s",
+								scenarioDesignation
+						)));
+				outlineIteration = String.format("[%d]", iterationIdx + 1);
+			}
+		}
 
-        void processTags(List<PickleTag> pickleTags) {
-            attributes = Utils.extractPickleTags(pickleTags);
-        }
+		void processTags(List<PickleTag> pickleTags) {
+			attributes = Utils.extractPickleTags(pickleTags);
+		}
 
-        void mapBackgroundSteps(Background background) {
-            for (Step step : background.getSteps()) {
-                scenarioLocationMap.put(step.getLocation().getLine(), step);
-            }
-        }
+		void mapBackgroundSteps(Background background) {
+			for (Step step : background.getSteps()) {
+				scenarioLocationMap.put(step.getLocation().getLine(), step);
+			}
+		}
 
-        String getName() {
-            return scenario.getName();
-        }
+		String getName() {
+			return scenario.getName();
+		}
 
-        String getKeyword() {
-            return scenario.getKeyword();
-        }
+		String getKeyword() {
+			return scenario.getKeyword();
+		}
 
-        int getLine() {
-            return isScenarioOutline(scenario) ? testCase.getLine() : scenario.getLocation().getLine();
-        }
+		int getLine() {
+			return isScenarioOutline(scenario) ? testCase.getLine() : scenario.getLocation().getLine();
+		}
 
-        String getStepPrefix() {
-            return hasBackground() && withBackground() ? background.getKeyword().toUpperCase() + AbstractReporter.COLON_INFIX : "";
-        }
+		String getStepPrefix() {
+			return hasBackground() && withBackground() ? background.getKeyword().toUpperCase() + AbstractReporter.COLON_INFIX : "";
+		}
 
-        Step getStep(TestStep testStep) {
-            PickleStepTestStep pickleStepTestStep = (PickleStepTestStep) testStep;
-            Step step = scenarioLocationMap.get(pickleStepTestStep.getStepLine());
-            if (step != null) {
-                return step;
-            }
-            throw new IllegalStateException(String.format("Trying to get step for unknown line in feature. " + "Scenario: %s, line: %s",
-                    scenario.getName(),
-                    getLine()
-            ));
-        }
+		Step getStep(TestStep testStep) {
+			PickleStepTestStep pickleStepTestStep = (PickleStepTestStep) testStep;
+			Step step = scenarioLocationMap.get(pickleStepTestStep.getStepLine());
+			if (step != null) {
+				return step;
+			}
+			throw new IllegalStateException(String.format("Trying to get step for unknown line in feature. " + "Scenario: %s, line: %s",
+					scenario.getName(),
+					getLine()
+			));
+		}
 
-        Maybe<String> getId() {
-            return id;
-        }
+		Maybe<String> getId() {
+			return id;
+		}
 
-        void setId(Maybe<String> newId) {
-            if (id != null) {
-                throw new IllegalStateException("Attempting re-set scenario ID for unfinished scenario: " + getName());
-            }
-            id = newId;
-        }
+		void setId(Maybe<String> newId) {
+			if (id != null) {
+				throw new IllegalStateException("Attempting re-set scenario ID for unfinished scenario: " + getName());
+			}
+			id = newId;
+		}
 
-        void setTestCase(TestCase testCase) {
-            this.testCase = testCase;
-            scenarioDesignation = testCase.getScenarioDesignation();
-        }
+		void setTestCase(TestCase testCase) {
+			this.testCase = testCase;
+			scenarioDesignation = testCase.getScenarioDesignation();
+		}
 
-        void nextBackgroundStep() {
-            backgroundSteps.poll();
-        }
+		void nextBackgroundStep() {
+			backgroundSteps.poll();
+		}
 
-        boolean isScenarioOutline(ScenarioDefinition scenario) {
-            return scenario instanceof ScenarioOutline;
-        }
+		boolean isScenarioOutline(ScenarioDefinition scenario) {
+			return scenario instanceof ScenarioOutline;
+		}
 
-        boolean withBackground() {
-            return !backgroundSteps.isEmpty();
-        }
+		boolean withBackground() {
+			return !backgroundSteps.isEmpty();
+		}
 
-        boolean hasBackground() {
-            return hasBackground && background != null;
-        }
+		boolean hasBackground() {
+			return hasBackground && background != null;
+		}
 
-        String getOutlineIteration() {
-            return outlineIteration;
-        }
-    }
+		String getOutlineIteration() {
+			return outlineIteration;
+		}
+	}
 }

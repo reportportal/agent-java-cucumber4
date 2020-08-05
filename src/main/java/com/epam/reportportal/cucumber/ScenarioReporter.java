@@ -139,15 +139,12 @@ public class ScenarioReporter extends AbstractReporter {
      * Start root suite
      */
     protected void startRootItem() {
-        rootSuiteId = Suppliers.memoize(new Supplier<Maybe<String>>() {
-            @Override
-            public Maybe<String> get() {
-                StartTestItemRQ rq = new StartTestItemRQ();
-                rq.setName(DUMMY_ROOT_SUITE_NAME);
-                rq.setStartTime(Calendar.getInstance().getTime());
-                rq.setType(RP_STORY_TYPE);
-                return launch.get().startTestItem(rq);
-            }
+        rootSuiteId = Suppliers.memoize(() -> {
+            StartTestItemRQ rq = new StartTestItemRQ();
+            rq.setName(DUMMY_ROOT_SUITE_NAME);
+            rq.setStartTime(Calendar.getInstance().getTime());
+            rq.setType(RP_STORY_TYPE);
+            return launch.get().startTestItem(rq);
         });
     }
 
