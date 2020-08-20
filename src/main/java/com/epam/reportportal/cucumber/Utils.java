@@ -129,6 +129,10 @@ public class Utils {
 		rq.setAttributes(attributes);
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType(type);
+		if ("STEP".equals(type)) {
+			rq.setTestCaseId(TestCaseIdUtils.getTestCaseId(codeRef, null).getId());
+		}
+
 		return rp.startTestItem(rootItemId, rq);
 	}
 
@@ -312,26 +316,6 @@ public class Utils {
 
 	}
 
-	@Nullable
-	public static TestCaseIdEntry getTestCaseId(TestStep testStep, String codeRef) {
-		Field definitionMatchField = getDefinitionMatchField(testStep);
-		if (definitionMatchField != null) {
-			try {
-				Method method = retrieveMethod(definitionMatchField, testStep);
-				TestCaseId testCaseIdAnnotation = method.getAnnotation(TestCaseId.class);
-				return ofNullable(testCaseIdAnnotation).flatMap(annotation -> ofNullable(getTestCaseId(testCaseIdAnnotation,
-						method,
-						((PickleStepTestStep) testStep).getDefinitionArgument()
-				)))
-						.orElseGet(() -> getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument()));
-			} catch (NoSuchFieldException | IllegalAccessException e) {
-				return getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
-			}
-		} else {
-			return getTestCaseId(codeRef, ((PickleStepTestStep) testStep).getDefinitionArgument());
-		}
-	}
-
 	static List<ParameterResource> getParameters(List<cucumber.api.Argument> arguments, String text) {
 		List<ParameterResource> parameters = Lists.newArrayList();
 		ArrayList<String> parameterNames = Lists.newArrayList();
@@ -363,27 +347,30 @@ public class Utils {
 		return (Method) methodField.get(javaStepDefinition);
 	}
 
-	@Nullable
-	private static TestCaseIdEntry getTestCaseId(TestCaseId testCaseId, Method method, List<cucumber.api.Argument> arguments) {
-		if (testCaseId.parametrized()) {
-			List<String> values = new ArrayList<>(arguments.size());
-			for (cucumber.api.Argument argument : arguments) {
-				values.add(argument.getValue());
+	private static final java.util.function.Function<List<cucumber.api.Argument>, List<?>> ARGUMENTS_TRANSFORM = arguments -> ofNullable(
+			arguments).map(args -> args.stream().map(cucumber.api.Argument::getValue).collect(Collectors.toList())).orElse(null);
+
+	@SuppressWarnings("unchecked")
+	public static TestCaseIdEntry getTestCaseId(TestStep testStep, String codeRef) {
+		Field definitionMatchField = getDefinitionMatchField(testStep);
+		List<cucumber.api.Argument> arguments = ((PickleStepTestStep) testStep).getDefinitionArgument();
+		if (definitionMatchField != null) {
+			try {
+				Method method = retrieveMethod(definitionMatchField, testStep);
+				return TestCaseIdUtils.getTestCaseId(method.getAnnotation(TestCaseId.class),
+						method,
+						codeRef,
+						(List<Object>) ARGUMENTS_TRANSFORM.apply(arguments)
+				);
+			} catch (NoSuchFieldException | IllegalAccessException ignore) {
 			}
-			return TestCaseIdUtils.getParameterizedTestCaseId(method, values.toArray());
-		} else {
-			return new TestCaseIdEntry(testCaseId.value());
 		}
+		return getTestCaseId(codeRef, arguments);
 	}
 
-	private static final Function<List<cucumber.api.Argument>, String> TRANSFORM_PARAMETERS = args -> ofNullable(args).map(a -> a.stream()
-			.map(cucumber.api.Argument::getValue)
-			.collect(Collectors.joining(",", "[", "]"))).orElse("");
-
+	@SuppressWarnings("unchecked")
 	private static TestCaseIdEntry getTestCaseId(String codeRef, List<cucumber.api.Argument> arguments) {
-		return ofNullable(arguments).filter(args -> !args.isEmpty())
-				.map(args -> new TestCaseIdEntry(codeRef + TRANSFORM_PARAMETERS.apply(args)))
-				.orElseGet(() -> new TestCaseIdEntry(codeRef));
+		return TestCaseIdUtils.getTestCaseId(codeRef, (List<Object>) ARGUMENTS_TRANSFORM.apply(arguments));
 	}
 
 	private static Field getDefinitionMatchField(TestStep testStep) {
