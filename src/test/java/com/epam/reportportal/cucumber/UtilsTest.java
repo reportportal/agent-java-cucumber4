@@ -2,7 +2,7 @@ package com.epam.reportportal.cucumber;
 
 import com.epam.ta.reportportal.ws.model.ParameterResource;
 import cucumber.api.Argument;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import rp.com.google.common.collect.Lists;
 
 import java.util.Collections;
@@ -10,7 +10,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static org.junit.Assert.*;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
 
 /**
  * @author <a href="mailto:ihar_kahadouski@epam.com">Ihar Kahadouski</a>
@@ -20,8 +21,7 @@ public class UtilsTest {
 	@Test
 	public void retrieveParamsFromTestWithoutParamsTest() {
 		List<ParameterResource> parameters = Utils.getParameters(Collections.emptyList(), "Test without params");
-		assertNotNull(parameters);
-		assertTrue(parameters.isEmpty());
+		assertThat(parameters, allOf(notNullValue(), empty()));
 	}
 
 	@Test
@@ -31,11 +31,10 @@ public class UtilsTest {
 		List<ParameterResource> parameters = Utils.getParameters(Lists.newArrayList(getTestArgument(parameterValue)),
 				String.format("Test with <%s>", parameterName)
 		);
-		assertNotNull(parameters);
-		assertEquals(1, parameters.size());
+		assertThat(parameters, allOf(notNullValue(), hasSize(1)));
 		parameters.forEach(it -> {
-			assertEquals(parameterName, it.getKey());
-			assertEquals(parameterValue, it.getValue());
+			assertThat(it.getKey(), equalTo(parameterName));
+			assertThat(it.getValue(), equalTo(parameterValue));
 		});
 	}
 
@@ -48,11 +47,10 @@ public class UtilsTest {
 						.collect(Collectors.toList()),
 				String.format("Test with %s", "<" + String.join("> <", parameterNames) + ">")
 		);
-		assertNotNull(parameters);
-		assertEquals(2, parameters.size());
+		assertThat(parameters, allOf(notNullValue(), hasSize(2)));
 		IntStream.range(0, parameters.size()).forEach(index -> {
-			assertEquals(parameterNames.get(index), parameters.get(index).getKey());
-			assertEquals(parameterValues.get(index), parameters.get(index).getValue());
+			assertThat(parameters.get(index).getKey(), equalTo(parameterNames.get(index)));
+			assertThat(parameters.get(index).getValue(), equalTo(parameterValues.get(index)));
 		});
 	}
 
