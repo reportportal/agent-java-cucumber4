@@ -139,8 +139,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 			RunningContext.ScenarioContext currentScenarioContext, String scenarioName) {
 		String description = getDescription(currentFeatureContext.getUri());
 		String codeRef = getCodeRef(currentFeatureContext.getUri(), currentScenarioContext.getLine());
-		Maybe<String> id = Utils.startNonLeafNode(
-				launch.get(),
+		Maybe<String> id = Utils.startNonLeafNode(launch.get(),
 				currentFeatureContext.getFeatureId(),
 				scenarioName,
 				description,
@@ -302,6 +301,23 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 
 	protected abstract Maybe<String> getRootItemId();
 
+	private RunningContext.FeatureContext createFeatureContext(TestCase testCase) {
+		RunningContext.FeatureContext currentFeatureContext;
+		currentFeatureContext = new RunningContext.FeatureContext().processTestSourceReadEvent(testCase);
+		String featureKeyword = currentFeatureContext.getFeature().getKeyword();
+		String featureName = currentFeatureContext.getFeature().getName();
+		StartTestItemRQ rq = new StartTestItemRQ();
+		Maybe<String> root = getRootItemId();
+		rq.setDescription(getDescription(currentFeatureContext.getUri()));
+		rq.setCodeRef(getCodeRef(currentFeatureContext.getUri(), 0));
+		rq.setName(Utils.buildNodeName(featureKeyword, AbstractReporter.COLON_INFIX, featureName, null));
+		rq.setAttributes(currentFeatureContext.getAttributes());
+		rq.setStartTime(Calendar.getInstance().getTime());
+		rq.setType(getFeatureTestItemType());
+		currentFeatureContext.setFeatureId(root == null ? launch.get().startTestItem(rq) : launch.get().startTestItem(root, rq));
+		return currentFeatureContext;
+	}
+
 	/**
 	 * Private part that responsible for handling events
 	 */
@@ -357,17 +373,16 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		TestCase testCase = event.testCase;
 		RunningContext.FeatureContext featureContext = new RunningContext.FeatureContext().processTestSourceReadEvent(testCase);
 		String featureUri = featureContext.getUri();
-		RunningContext.FeatureContext currentFeatureContext = currentFeatureContextMap.get(featureUri);
-
-		currentFeatureContext = currentFeatureContext == null ? createFeatureContext(testCase, featureUri) : currentFeatureContext;
+		RunningContext.FeatureContext currentFeatureContext = currentFeatureContextMap.computeIfAbsent(featureUri,
+				u -> createFeatureContext(testCase)
+		);
 
 		if (!currentFeatureContext.getUri().equals(testCase.getUri())) {
 			throw new IllegalStateException("Scenario URI does not match Feature URI.");
 		}
 
 		RunningContext.ScenarioContext scenarioContext = currentFeatureContext.getScenarioContext(testCase);
-		String scenarioName = Utils.buildNodeName(
-				scenarioContext.getKeyword(),
+		String scenarioName = Utils.buildNodeName(scenarioContext.getKeyword(),
 				AbstractReporter.COLON_INFIX,
 				scenarioContext.getName(),
 				scenarioContext.getOutlineIteration()
@@ -383,25 +398,6 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		}
 
 		beforeScenario(currentFeatureContext, currentScenarioContext, scenarioName);
-	}
-
-	private RunningContext.FeatureContext createFeatureContext(TestCase testCase, String featureURI) {
-		RunningContext.FeatureContext currentFeatureContext;
-		currentFeatureContext = new RunningContext.FeatureContext().processTestSourceReadEvent(testCase);
-		currentFeatureContextMap.put(featureURI, currentFeatureContext);
-		String featureKeyword = currentFeatureContext.getFeature().getKeyword();
-		String featureName = currentFeatureContext.getFeature().getName();
-
-		StartTestItemRQ rq = new StartTestItemRQ();
-		Maybe<String> root = getRootItemId();
-		rq.setDescription(getDescription(currentFeatureContext.getUri()));
-		rq.setCodeRef(getCodeRef(currentFeatureContext.getUri(), 0));
-		rq.setName(Utils.buildNodeName(featureKeyword, AbstractReporter.COLON_INFIX, featureName, null));
-		rq.setAttributes(currentFeatureContext.getAttributes());
-		rq.setStartTime(Calendar.getInstance().getTime());
-		rq.setType(getFeatureTestItemType());
-		currentFeatureContext.setFeatureId(root == null ? launch.get().startTestItem(rq) : launch.get().startTestItem(root, rq));
-		return currentFeatureContext;
 	}
 
 	protected void handleTestStepStarted(TestStepStarted event) {
