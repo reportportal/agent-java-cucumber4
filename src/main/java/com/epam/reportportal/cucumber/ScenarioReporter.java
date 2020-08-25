@@ -22,12 +22,11 @@ import cucumber.api.Result;
 import cucumber.api.TestStep;
 import gherkin.ast.Step;
 import io.reactivex.Maybe;
+import org.apache.commons.lang3.tuple.Pair;
 import rp.com.google.common.base.Supplier;
 import rp.com.google.common.base.Suppliers;
 
 import java.util.Calendar;
-
-import static cucumber.api.Result.Type.PASSED;
 
 /**
  * Cucumber reporter for ReportPortal that reports scenarios as test methods.
@@ -51,110 +50,101 @@ import static cucumber.api.Result.Type.PASSED;
  * @author Vitaliy Tsvihun
  */
 public class ScenarioReporter extends AbstractReporter {
-    private static final String SEPARATOR = " --- ";
-    private static final String RP_TEST_TYPE = "TEST";
-    private static final String RP_STEP_TYPE = "STEP";
-    private static final String HOOK_COLON = "Hook:";
-    private static final String COLON_ = ": ";
-    private static final String STEP_ = "STEP ";
-    private static final String EMPTY_SUFFIX = "";
-    private static final String INFO = "INFO";
-    private static final String RP_STORY_TYPE = "STORY";
-    private static final String DUMMY_ROOT_SUITE_NAME = "Root User Story";
+	private static final String RP_TEST_TYPE = "TEST";
+	private static final String RP_STEP_TYPE = "STEP";
+	private static final String RP_STORY_TYPE = "STORY";
+	private static final String DUMMY_ROOT_SUITE_NAME = "Root User Story";
 
-    protected Supplier<Maybe<String>> rootSuiteId;
+	protected Supplier<Maybe<String>> rootSuiteId;
 
-    @Override
-    protected void beforeLaunch() {
-        super.beforeLaunch();
-        startRootItem();
-    }
+	@Override
+	protected void beforeLaunch() {
+		super.beforeLaunch();
+		startRootItem();
+	}
 
-    @Override
-    protected void beforeStep(TestStep testStep) {
-        RunningContext.ScenarioContext currentScenarioContext = getCurrentScenarioContext();
-        Step step = currentScenarioContext.getStep(testStep);
-        int lineInFeaturefile = step.getLocation().getLine();
-        String decoratedStepName = lineInFeaturefile + decorateMessage(Utils.buildNodeName(currentScenarioContext.getStepPrefix(),
-                step.getKeyword(),
-                Utils.getStepName(testStep),
-                EMPTY_SUFFIX
-        ));
-        String multilineArg = Utils.buildMultilineArgument(testStep);
-        Utils.sendLog(decoratedStepName + multilineArg, INFO, null);
-    }
+	@Override
+	protected void beforeStep(TestStep testStep) {
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		Step step = context.getStep(testStep);
+		StartTestItemRQ rq = Utils.buildStartStepRequest(context.getStepPrefix(), testStep, step, false);
+		context.setCurrentStepId(launch.get().startTestItem(context.getId(), rq));
+	}
 
-    @Override
-    protected void afterStep(Result result) {
-        if (!result.is(PASSED)) {
-            reportResult(result, decorateMessage(STEP_ + result.getStatus().toString().toUpperCase()));
-        }
-    }
+	@Override
+	protected void afterStep(Result result) {
+		reportResult(result, null);
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		Utils.finishTestItem(launch.get(), context.getCurrentStepId(), result.getStatus());
+		context.setCurrentStepId(null);
+	}
 
-    @Override
-    protected void beforeHooks(HookType hookType) {
-        // noop
-    }
+	@Override
+	protected void beforeHooks(HookType hookType) {
+		StartTestItemRQ rq = new StartTestItemRQ();
+		rq.setHasStats(false);
+		Pair<String, String> typeAndName = Utils.getHookTypeAndName(hookType);
+		rq.setType(typeAndName.getKey());
+		rq.setName(typeAndName.getValue());
+		rq.setStartTime(Calendar.getInstance().getTime());
 
-    @Override
-    protected void afterHooks(Boolean isBefore) {
-        // noop
-    }
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		context.setHookStepId(launch.get().startTestItem(getCurrentScenarioContext().getId(), rq));
+		context.setHookStatus(Result.Type.PASSED);
+	}
 
-    @Override
-    protected void hookFinished(HookTestStep step, Result result, Boolean isBefore) {
-        reportResult(result, step.getHookType().name() + HOOK_COLON + result.getStatus() + COLON_ + step.getCodeLocation());
-    }
+	@Override
+	protected void afterHooks(Boolean isBefore) {
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		Utils.finishTestItem(launch.get(), context.getHookStepId(), context.getHookStatus());
+		context.setHookStepId(null);
+	}
 
-    @Override
-    protected String getFeatureTestItemType() {
-        return RP_TEST_TYPE;
-    }
+	@Override
+	protected void hookFinished(HookTestStep step, Result result, Boolean isBefore) {
+		reportResult(result, (isBefore ? "Before" : "After") + " hook: " + step.getCodeLocation());
+		getCurrentScenarioContext().setHookStatus(result.getStatus());
+	}
 
-    @Override
-    protected String getScenarioTestItemType() {
-        return RP_STEP_TYPE;
-    }
+	@Override
+	protected String getFeatureTestItemType() {
+		return RP_TEST_TYPE;
+	}
 
-    @Override
-    protected Maybe<String> getRootItemId() {
-        return rootSuiteId.get();
-    }
+	@Override
+	protected String getScenarioTestItemType() {
+		return RP_STEP_TYPE;
+	}
 
-    @Override
-    protected void afterLaunch() {
-        finishRootItem();
-        super.afterLaunch();
-    }
+	@Override
+	protected Maybe<String> getRootItemId() {
+		return rootSuiteId.get();
+	}
 
-    /**
-     * Finish root suite
-     */
-    protected void finishRootItem() {
-        Utils.finishTestItem(launch.get(), rootSuiteId.get());
-        rootSuiteId = null;
-    }
+	@Override
+	protected void afterLaunch() {
+		finishRootItem();
+		super.afterLaunch();
+	}
 
-    /**
-     * Start root suite
-     */
-    protected void startRootItem() {
-        rootSuiteId = Suppliers.memoize(() -> {
-            StartTestItemRQ rq = new StartTestItemRQ();
-            rq.setName(DUMMY_ROOT_SUITE_NAME);
-            rq.setStartTime(Calendar.getInstance().getTime());
-            rq.setType(RP_STORY_TYPE);
-            return launch.get().startTestItem(rq);
-        });
-    }
+	/**
+	 * Finish root suite
+	 */
+	protected void finishRootItem() {
+		Utils.finishTestItem(launch.get(), rootSuiteId.get());
+		rootSuiteId = null;
+	}
 
-    /**
-     * Add separators to log item to distinguish from real log messages
-     *
-     * @param message to decorate
-     * @return decorated message
-     */
-    protected String decorateMessage(String message) {
-        return SEPARATOR + message;
-    }
+	/**
+	 * Start root suite
+	 */
+	protected void startRootItem() {
+		rootSuiteId = Suppliers.memoize(() -> {
+			StartTestItemRQ rq = new StartTestItemRQ();
+			rq.setName(DUMMY_ROOT_SUITE_NAME);
+			rq.setStartTime(Calendar.getInstance().getTime());
+			rq.setType(RP_STORY_TYPE);
+			return launch.get().startTestItem(rq);
+		});
+	}
 }

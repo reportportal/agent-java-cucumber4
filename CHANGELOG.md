@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- Nested steps support
 
 ## [5.0.0-BETA-14]
 ### Added
