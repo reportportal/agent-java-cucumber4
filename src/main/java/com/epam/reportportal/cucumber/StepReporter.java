@@ -47,6 +47,9 @@ import java.util.Calendar;
  * @author Vitaliy Tsvihun
  */
 public class StepReporter extends AbstractReporter {
+	private static final String RP_STORY_TYPE = "STORY";
+	private static final String RP_TEST_TYPE = "SCENARIO";
+
 	public StepReporter() {
 		super();
 	}
@@ -100,11 +103,11 @@ public class StepReporter extends AbstractReporter {
 
 	@Override
 	protected String getFeatureTestItemType() {
-		return "SUITE";
+		return RP_STORY_TYPE;
 	}
 
 	@Override
 	protected String getScenarioTestItemType() {
-		return "SCENARIO";
+		return RP_TEST_TYPE;
 	}
 }

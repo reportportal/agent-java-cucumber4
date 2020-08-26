@@ -50,9 +50,9 @@ import java.util.Calendar;
  * @author Vitaliy Tsvihun
  */
 public class ScenarioReporter extends AbstractReporter {
-	private static final String RP_TEST_TYPE = "TEST";
+	private static final String RP_STORY_TYPE = "SUITE";
+	private static final String RP_TEST_TYPE = "STORY";
 	private static final String RP_STEP_TYPE = "STEP";
-	private static final String RP_STORY_TYPE = "STORY";
 	private static final String DUMMY_ROOT_SUITE_NAME = "Root User Story";
 
 	protected Supplier<Maybe<String>> rootSuiteId;
