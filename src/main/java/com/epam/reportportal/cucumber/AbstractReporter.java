@@ -390,15 +390,15 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		);
 
 		Pair<String, String> scenarioNameFeatureURI = Pair.of(testCase.getScenarioDesignation(), currentFeatureContext.getUri());
-		RunningContext.ScenarioContext currentScenarioContext = currentScenarioContextMap.get(scenarioNameFeatureURI);
+		RunningContext.ScenarioContext scenarioContext = currentScenarioContextMap.get(scenarioNameFeatureURI);
 
-		if (currentScenarioContext == null) {
-			currentScenarioContext = currentFeatureContext.getScenarioContext(testCase);
-			currentScenarioContextMap.put(scenarioNameFeatureURI, currentScenarioContext);
-			this.currentScenarioContext.set(currentScenarioContext);
+		if (scenarioContext == null) {
+			scenarioContext = currentFeatureContext.getScenarioContext(testCase);
+			currentScenarioContextMap.put(scenarioNameFeatureURI, scenarioContext);
+			currentScenarioContext.set(scenarioContext);
 		}
 
-		beforeScenario(currentFeatureContext, currentScenarioContext, scenarioName);
+		beforeScenario(currentFeatureContext, scenarioContext, scenarioName);
 	}
 
 	protected void handleTestStepStarted(TestStepStarted event) {
