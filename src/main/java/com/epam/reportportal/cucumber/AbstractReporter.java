@@ -66,7 +66,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 
 	private final Map<Pair<String, String>, RunningContext.ScenarioContext> currentScenarioContextMap = new ConcurrentHashMap<>();
 
-	private final Map<Long, RunningContext.ScenarioContext> threadCurrentScenarioContextMap = new ConcurrentHashMap<>();
+	private final ThreadLocal<RunningContext.ScenarioContext> currentScenarioContext = new ThreadLocal<>();
 
 	// There is no event for recognizing end of feature in Cucumber.
 	// This map is used to record the last scenario time and its feature uri.
@@ -103,7 +103,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	}
 
 	protected RunningContext.ScenarioContext getCurrentScenarioContext() {
-		return threadCurrentScenarioContextMap.get(Thread.currentThread().getId());
+		return currentScenarioContext.get();
 	}
 
 	/**
@@ -136,18 +136,18 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 * Start Cucumber scenario
 	 */
 	protected void beforeScenario(RunningContext.FeatureContext currentFeatureContext,
-			RunningContext.ScenarioContext currentScenarioContext, String scenarioName) {
+			RunningContext.ScenarioContext context, String scenarioName) {
 		String description = getDescription(currentFeatureContext.getUri());
-		String codeRef = getCodeRef(currentFeatureContext.getUri(), currentScenarioContext.getLine());
+		String codeRef = getCodeRef(currentFeatureContext.getUri(), context.getLine());
 		Maybe<String> id = Utils.startNonLeafNode(launch.get(),
 				currentFeatureContext.getFeatureId(),
 				scenarioName,
 				description,
 				codeRef,
-				currentScenarioContext.getAttributes(),
+				context.getAttributes(),
 				getScenarioTestItemType()
 		);
-		currentScenarioContext.setId(id);
+		context.setId(id);
 	}
 
 	/**
@@ -155,16 +155,17 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 * Put scenario end time in a map to check last scenario end time per feature
 	 */
 	protected void afterScenario(TestCaseFinished event) {
-		RunningContext.ScenarioContext currentScenarioContext = getCurrentScenarioContext();
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
 		for (Map.Entry<Pair<String, String>, RunningContext.ScenarioContext> scenarioContext : currentScenarioContextMap.entrySet()) {
-			if (scenarioContext.getValue().getLine() == currentScenarioContext.getLine()) {
+			if (scenarioContext.getValue().getLine() == context.getLine()) {
 				currentScenarioContextMap.remove(scenarioContext.getKey());
-				Date endTime = Utils.finishTestItem(launch.get(), currentScenarioContext.getId(), event.result.getStatus());
+				Date endTime = Utils.finishTestItem(launch.get(), context.getId(), event.result.getStatus());
 				String featureURI = scenarioContext.getKey().getValue();
 				featureEndTime.put(featureURI, endTime);
 				break;
 			}
 		}
+		currentScenarioContext.set(null);
 	}
 
 	/**
@@ -381,23 +382,23 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 			throw new IllegalStateException("Scenario URI does not match Feature URI.");
 		}
 
-		RunningContext.ScenarioContext scenarioContext = currentFeatureContext.getScenarioContext(testCase);
-		String scenarioName = Utils.buildNodeName(scenarioContext.getKeyword(),
+		RunningContext.ScenarioContext context = currentFeatureContext.getScenarioContext(testCase);
+		String scenarioName = Utils.buildNodeName(context.getKeyword(),
 				AbstractReporter.COLON_INFIX,
-				scenarioContext.getName(),
-				scenarioContext.getOutlineIteration()
+				context.getName(),
+				context.getOutlineIteration()
 		);
 
 		Pair<String, String> scenarioNameFeatureURI = Pair.of(testCase.getScenarioDesignation(), currentFeatureContext.getUri());
-		RunningContext.ScenarioContext currentScenarioContext = currentScenarioContextMap.get(scenarioNameFeatureURI);
+		RunningContext.ScenarioContext scenarioContext = currentScenarioContextMap.get(scenarioNameFeatureURI);
 
-		if (currentScenarioContext == null) {
-			currentScenarioContext = currentFeatureContext.getScenarioContext(testCase);
-			currentScenarioContextMap.put(scenarioNameFeatureURI, currentScenarioContext);
-			threadCurrentScenarioContextMap.put(Thread.currentThread().getId(), currentScenarioContext);
+		if (scenarioContext == null) {
+			scenarioContext = currentFeatureContext.getScenarioContext(testCase);
+			currentScenarioContextMap.put(scenarioNameFeatureURI, scenarioContext);
+			currentScenarioContext.set(scenarioContext);
 		}
 
-		beforeScenario(currentFeatureContext, currentScenarioContext, scenarioName);
+		beforeScenario(currentFeatureContext, scenarioContext, scenarioName);
 	}
 
 	protected void handleTestStepStarted(TestStepStarted event) {

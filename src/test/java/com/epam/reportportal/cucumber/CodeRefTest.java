@@ -76,13 +76,9 @@ public class CodeRefTest {
 		TestStepReporter.RP.set(reportPortal);
 	}
 
-	private static final Pair<String, String> FEATURE_CODE_REFERENCES = Pair.of("file:",
-			"src/test/resources/features/belly.feature:0"
-	);
+	private static final Pair<String, String> FEATURE_CODE_REFERENCES = Pair.of("file:", "src/test/resources/features/belly.feature:0");
 
-	private static final Pair<String, String> SCENARIO_CODE_REFERENCES = Pair.of("file:",
-			"src/test/resources/features/belly.feature:4"
-	);
+	private static final Pair<String, String> SCENARIO_CODE_REFERENCES = Pair.of("file:", "src/test/resources/features/belly.feature:4");
 
 	@Test
 	public void verify_code_reference_scenario_reporter() {
@@ -134,8 +130,10 @@ public class CodeRefTest {
 				.forEach(i -> assertThat(steps.get(i).getCodeRef(), allOf(notNullValue(), equalTo(STEP_CODE_REFERENCE.get(i)))));
 	}
 
-	private static final List<Pair<String, String>> TWO_FEATURES_CODE_REFERENCES = Arrays.asList(
-			Pair.of("file:", "src/test/resources/features/TwoScenarioInOne.feature:3"),
+	private static final List<Pair<String, String>> TWO_FEATURES_CODE_REFERENCES = Arrays.asList(Pair.of(
+			"file:",
+			"src/test/resources/features/TwoScenarioInOne.feature:3"
+			),
 			Pair.of("file:", "src/test/resources/features/TwoScenarioInOne.feature:7")
 	);
 

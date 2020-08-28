@@ -85,10 +85,12 @@ public class FeatureDescriptionTest {
 		StartTestItemRQ feature = items.get(0);
 		StartTestItemRQ scenario = items.get(1);
 
-		assertThat(feature.getDescription(),
+		assertThat(
+				feature.getDescription(),
 				allOf(notNullValue(), startsWith(FEATURE_CODE_REFERENCES.getKey()), endsWith(FEATURE_CODE_REFERENCES.getValue()))
 		);
-		assertThat(scenario.getDescription(),
+		assertThat(
+				scenario.getDescription(),
 				allOf(notNullValue(), startsWith(SCENARIO_CODE_REFERENCES.getKey()), endsWith(SCENARIO_CODE_REFERENCES.getValue()))
 		);
 	}
@@ -106,10 +108,12 @@ public class FeatureDescriptionTest {
 		StartTestItemRQ feature = items.get(0);
 		StartTestItemRQ scenario = items.get(1);
 
-		assertThat(feature.getDescription(),
+		assertThat(
+				feature.getDescription(),
 				allOf(notNullValue(), startsWith(FEATURE_CODE_REFERENCES.getKey()), endsWith(FEATURE_CODE_REFERENCES.getValue()))
 		);
-		assertThat(scenario.getDescription(),
+		assertThat(
+				scenario.getDescription(),
 				allOf(notNullValue(), startsWith(SCENARIO_CODE_REFERENCES.getKey()), endsWith(SCENARIO_CODE_REFERENCES.getValue()))
 		);
 	}
