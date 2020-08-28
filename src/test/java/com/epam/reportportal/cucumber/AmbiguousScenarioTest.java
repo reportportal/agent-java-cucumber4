@@ -63,13 +63,6 @@ public class AmbiguousScenarioTest {
 		TestStepReporter.RP.set(reportPortal);
 	}
 
-	public static void verifyRequest(StartTestItemRQ rq, String type, boolean hasStats) {
-		assertThat(rq.getType(), allOf(notNullValue(), equalTo(type)));
-		assertThat(rq.getStartTime(), notNullValue());
-		assertThat(rq.getName(), notNullValue());
-		assertThat(rq.isHasStats(), equalTo(hasStats));
-	}
-
 	@Test
 	public void verify_step_reporter_ambiguous_item() {
 		TestUtils.runTests(SimpleTestStepReporter.class);
