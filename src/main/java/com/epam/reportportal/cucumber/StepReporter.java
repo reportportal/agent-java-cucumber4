@@ -15,6 +15,7 @@
  */
 package com.epam.reportportal.cucumber;
 
+import com.epam.reportportal.service.Launch;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import cucumber.api.HookTestStep;
 import cucumber.api.HookType;
@@ -71,8 +72,10 @@ public class StepReporter extends AbstractReporter {
 	protected void afterStep(Result result) {
 		reportResult(result, null);
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
-		Utils.finishTestItem(launch.get(), context.getCurrentStepId(), result.getStatus());
+		Launch myLaunch = launch.get();
+		Utils.finishTestItem(myLaunch, context.getCurrentStepId(), result.getStatus());
 		context.setCurrentStepId(null);
+		myLaunch.getStepReporter().finishPreviousStep();
 	}
 
 	@Override
@@ -91,8 +94,10 @@ public class StepReporter extends AbstractReporter {
 	@Override
 	protected void afterHooks(Boolean isBefore) {
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
-		Utils.finishTestItem(launch.get(), context.getHookStepId(), context.getHookStatus());
+		Launch myLaunch = launch.get();
+		Utils.finishTestItem(myLaunch, context.getHookStepId(), context.getHookStatus());
 		context.setHookStepId(null);
+		myLaunch.getStepReporter().finishPreviousStep();
 	}
 
 	@Override
