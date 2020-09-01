@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- 'file:' prefix removed in CodeRef field
 
 ## [5.0.0-BETA-15]
 ### Fixed

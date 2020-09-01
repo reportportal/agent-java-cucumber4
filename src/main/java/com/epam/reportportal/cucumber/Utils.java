@@ -70,6 +70,7 @@ public class Utils {
 	private static final String ONE_SPACE = " ";
 	private static final String HOOK_ = "Hook: ";
 	private static final String NEW_LINE = "\r\n";
+	private static final String FILE_PREFIX = "file:";
 
 	private static final String DEFINITION_MATCH_FIELD_NAME = "definitionMatch";
 	private static final String STEP_DEFINITION_FIELD_NAME = "stepDefinition";
@@ -316,6 +317,12 @@ public class Utils {
 
 	}
 
+	@Nonnull
+	public static String getCodeRef(@Nonnull String uri, int line) {
+		String myUri = uri.startsWith(FILE_PREFIX) ? uri.substring(FILE_PREFIX.length()) : uri;
+		return myUri + ":" + line;
+	}
+
 	static List<ParameterResource> getParameters(List<cucumber.api.Argument> arguments, String text) {
 		List<ParameterResource> parameters = Lists.newArrayList();
 		ArrayList<String> parameterNames = Lists.newArrayList();
@@ -398,11 +405,6 @@ public class Utils {
 	@Nonnull
 	public static String getDescription(@Nonnull String uri) {
 		return uri;
-	}
-
-	@Nonnull
-	public static String getCodeRef(@Nonnull String uri, int line) {
-		return uri + ":" + line;
 	}
 
 	public static Pair<String, String> getHookTypeAndName(HookType hookType) {
