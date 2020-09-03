@@ -4,6 +4,8 @@
 ### Changed
 - 'file:' prefix removed in CodeRef field
 - Test step parameters handling
+### Fixed
+- Manually-reported nested steps now correctly fail all parents
 
 ## [5.0.0-BETA-15]
 ### Fixed
