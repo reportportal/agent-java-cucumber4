@@ -28,8 +28,6 @@ import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
 import com.epam.ta.reportportal.ws.model.ParameterResource;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
-import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
-import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
 import cucumber.api.*;
 import cucumber.runtime.StepDefinitionMatch;
 import gherkin.ast.Step;
@@ -41,7 +39,6 @@ import io.reactivex.annotations.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import rp.com.google.common.base.Function;
 import rp.com.google.common.collect.ImmutableMap;
 
 import javax.annotation.Nonnull;
@@ -134,18 +131,8 @@ public class Utils {
 		return rp.startTestItem(rootItemId, rq);
 	}
 
-	static void sendLog(final String message, final String level, final File file) {
-		ReportPortal.emitLog((Function<String, SaveLogRQ>) itemUuid -> {
-			SaveLogRQ rq = new SaveLogRQ();
-			rq.setMessage(message);
-			rq.setItemUuid(itemUuid);
-			rq.setLevel(level);
-			rq.setLogTime(Calendar.getInstance().getTime());
-			if (file != null) {
-				rq.setFile(file);
-			}
-			return rq;
-		});
+	static void sendLog(final String message, final String level) {
+		ReportPortal.emitLog(message, level, Calendar.getInstance().getTime());
 	}
 
 	/**

@@ -16,6 +16,7 @@
 package com.epam.reportportal.cucumber;
 
 import com.epam.reportportal.listeners.ListenerParameters;
+import com.epam.reportportal.message.ReportPortalMessage;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.utils.properties.SystemAttributesExtractor;
@@ -23,7 +24,6 @@ import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
-import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
 import cucumber.api.*;
 import cucumber.api.event.*;
 import io.reactivex.Maybe;
@@ -36,13 +36,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rp.com.google.common.base.Supplier;
 import rp.com.google.common.base.Suppliers;
+import rp.com.google.common.io.ByteSource;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static com.epam.reportportal.cucumber.Utils.getCodeRef;
@@ -274,10 +274,10 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		String level = Utils.mapLevel(cukesStatus);
 		String errorMessage = result.getErrorMessage();
 		if (errorMessage != null) {
-			Utils.sendLog(errorMessage, level, null);
+			Utils.sendLog(errorMessage, level);
 		}
 		if (message != null) {
-			Utils.sendLog(message, level, null);
+			Utils.sendLog(message, level);
 		}
 	}
 
@@ -299,7 +299,6 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 * @param data data to attach
 	 */
 	protected void embedding(String mimeType, byte[] data) {
-		File file = new File();
 		String type = mimeType;
 		try {
 			type = TIKA_THREAD_LOCAL.get().detect(new ByteArrayInputStream(data));
@@ -308,28 +307,18 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 			LOGGER.warn("Mime-type not found", e);
 		}
 		String prefix = "";
-		String extension = "";
 		try {
 
 			MediaType mt = getMimeTypes().forName(type).getType();
 			prefix = mt.getType();
-			if (MediaType.TEXT_PLAIN.equals(mt)) {
-				extension = "txt";
-			} else {
-				extension = mt.getSubtype();
-			}
 		} catch (MimeTypeException e) {
 			LOGGER.warn("Mime-type not found", e);
 		}
-		String name = prefix + UUID.randomUUID().toString() + "." + extension;
-		file.setName(name);
-		file.setContent(data);
-		file.setContentType(type);
-		Utils.sendLog(prefix, "UNKNOWN", file);
+		ReportPortal.emitLog(new ReportPortalMessage(ByteSource.wrap(data), type, prefix), "UNKNOWN", Calendar.getInstance().getTime());
 	}
 
 	protected void write(String text) {
-		Utils.sendLog(text, "INFO", null);
+		Utils.sendLog(text, "INFO");
 	}
 
 	private boolean isBefore(TestStep step) {
