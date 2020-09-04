@@ -42,7 +42,7 @@ import java.util.stream.Stream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.endsWith;
-import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.*;
 import static org.mockito.Mockito.*;
 
 @SuppressWarnings("unchecked")
@@ -108,6 +108,8 @@ public class EmbeddingTest {
 				.filter(l -> Objects.nonNull(l.getFile()))
 				.collect(Collectors.toList());
 
+		assertThat(logs, hasSize(3));
+
 		logs.forEach(l -> assertThat(l.getFile().getContentType(), equalTo("image/jpeg")));
 	}
 
@@ -123,6 +125,8 @@ public class EmbeddingTest {
 				.flatMap(l -> ((List<SaveLogRQ>) l.getRequest()).stream())
 				.filter(l -> Objects.nonNull(l.getFile()))
 				.collect(Collectors.toList());
+
+		assertThat(logs, hasSize(3));
 
 		logs.forEach(l -> {
 			SaveLogRQ.File file = l.getFile();
@@ -144,6 +148,8 @@ public class EmbeddingTest {
 				.filter(l -> Objects.nonNull(l.getFile()))
 				.collect(Collectors.toList());
 
+		assertThat(logs, hasSize(3));
+
 		logs.forEach(l -> assertThat(l.getFile().getContentType(), equalTo("application/pdf")));
 	}
 
@@ -159,6 +165,8 @@ public class EmbeddingTest {
 				.flatMap(l -> ((List<SaveLogRQ>) l.getRequest()).stream())
 				.filter(l -> Objects.nonNull(l.getFile()))
 				.collect(Collectors.toList());
+
+		assertThat(logs, hasSize(3));
 
 		logs.forEach(l -> assertThat(l.getFile().getContentType(), equalTo("application/zip")));
 	}
