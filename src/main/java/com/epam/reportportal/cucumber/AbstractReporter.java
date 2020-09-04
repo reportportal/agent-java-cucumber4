@@ -292,6 +292,12 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		return mimeTypes;
 	}
 
+	/**
+	 * Send a log with data attached.
+	 *
+	 * @param mimeType an attachment type
+	 * @param data data to attach
+	 */
 	protected void embedding(String mimeType, byte[] data) {
 		File file = new File();
 		String type = mimeType;
