@@ -28,6 +28,8 @@ import cucumber.api.*;
 import cucumber.api.event.*;
 import io.reactivex.Maybe;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.tika.Tika;
+import org.apache.tika.mime.MediaType;
 import org.apache.tika.mime.MimeTypeException;
 import org.apache.tika.mime.MimeTypes;
 import org.slf4j.Logger;
@@ -35,6 +37,8 @@ import org.slf4j.LoggerFactory;
 import rp.com.google.common.base.Supplier;
 import rp.com.google.common.base.Suppliers;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Map;
@@ -277,19 +281,45 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		}
 	}
 
+	private static final ThreadLocal<Tika> TIKA_THREAD_LOCAL = ThreadLocal.withInitial(Tika::new);
+
+	private volatile MimeTypes mimeTypes = null;
+
+	private MimeTypes getMimeTypes() {
+		if (mimeTypes == null) {
+			mimeTypes = MimeTypes.getDefaultMimeTypes();
+		}
+		return mimeTypes;
+	}
+
 	protected void embedding(String mimeType, byte[] data) {
 		File file = new File();
-		String embeddingName;
+		String type = mimeType;
 		try {
-			embeddingName = MimeTypes.getDefaultMimeTypes().forName(mimeType).getType().getType();
+			type = TIKA_THREAD_LOCAL.get().detect(new ByteArrayInputStream(data));
+		} catch (IOException e) {
+			// nothing to do we will use bypassed mime type
+			LOGGER.warn("Mime-type not found", e);
+		}
+		String prefix = "";
+		String extension = "";
+		try {
+
+			MediaType mt = getMimeTypes().forName(type).getType();
+			prefix = mt.getType();
+			if (MediaType.TEXT_PLAIN.equals(mt)) {
+				extension = "txt";
+			} else {
+				extension = mt.getSubtype();
+			}
 		} catch (MimeTypeException e) {
 			LOGGER.warn("Mime-type not found", e);
-			embeddingName = "embedding";
 		}
-		file.setName(UUID.randomUUID().toString());
+		String name = prefix + UUID.randomUUID().toString() + "." + extension;
+		file.setName(name);
 		file.setContent(data);
-		file.setContentType(embeddingName);
-		Utils.sendLog(embeddingName, "UNKNOWN", file);
+		file.setContentType(type);
+		Utils.sendLog(prefix, "UNKNOWN", file);
 	}
 
 	protected void write(String text) {
