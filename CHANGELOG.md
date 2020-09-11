@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Callback reporting
 ### Changed
 - 'file:' prefix removed in CodeRef field
 - Test step parameters handling
