@@ -18,7 +18,6 @@ package com.epam.reportportal.cucumber.util;
 
 import com.epam.reportportal.service.tree.TestItemTree;
 
-import java.net.URI;
 import java.util.Optional;
 
 import static java.util.Optional.ofNullable;
@@ -29,7 +28,7 @@ import static java.util.Optional.ofNullable;
 public class ItemTreeUtils {
 
 	private ItemTreeUtils() {
-		//static only
+		throw new AssertionError("No instances should exist for the class!");
 	}
 
 	public static TestItemTree.ItemTreeKey createKey(String key) {
@@ -49,7 +48,8 @@ public class ItemTreeUtils {
 		return suiteLeaf.map(leaf -> leaf.getChildItems().get(createKey(lineNumber)));
 	}
 
-	public static Optional<TestItemTree.TestItemLeaf> retrieveLeaf(String featureUri, int lineNumber, String text, TestItemTree testItemTree) {
+	public static Optional<TestItemTree.TestItemLeaf> retrieveLeaf(String featureUri, int lineNumber, String text,
+			TestItemTree testItemTree) {
 		Optional<TestItemTree.TestItemLeaf> testClassLeaf = retrieveLeaf(featureUri, lineNumber, testItemTree);
 		return testClassLeaf.map(leaf -> leaf.getChildItems().get(createKey(text)));
 	}

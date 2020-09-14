@@ -1,11 +1,11 @@
 /*
- * Copyright 2018 EPAM Systems
+ * Copyright 2020 EPAM Systems
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,6 +19,8 @@ import com.epam.reportportal.listeners.ListenerParameters;
 import com.epam.reportportal.message.ReportPortalMessage;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
+import com.epam.reportportal.service.item.TestCaseIdEntry;
+import com.epam.reportportal.service.tree.TestItemTree;
 import com.epam.reportportal.utils.properties.SystemAttributesExtractor;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
@@ -26,6 +28,7 @@ import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
 import cucumber.api.*;
 import cucumber.api.event.*;
+import gherkin.ast.Step;
 import io.reactivex.Maybe;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.tika.Tika;
@@ -38,16 +41,19 @@ import rp.com.google.common.base.Supplier;
 import rp.com.google.common.base.Suppliers;
 import rp.com.google.common.io.ByteSource;
 
+import javax.annotation.Nonnull;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static com.epam.reportportal.cucumber.Utils.getCodeRef;
 import static com.epam.reportportal.cucumber.Utils.getDescription;
+import static com.epam.reportportal.cucumber.util.ItemTreeUtils.createKey;
+import static com.epam.reportportal.cucumber.util.ItemTreeUtils.retrieveLeaf;
+import static java.util.Optional.ofNullable;
 import static rp.com.google.common.base.Strings.isNullOrEmpty;
+import static rp.com.google.common.base.Throwables.getStackTraceAsString;
 
 /**
  * Abstract Cucumber 4.x formatter for Report Portal
@@ -56,19 +62,23 @@ import static rp.com.google.common.base.Strings.isNullOrEmpty;
  * @author Andrei Varabyeu
  * @author Serhii Zharskyi
  * @author Vitaliy Tsvihun
+ * @author Vadzim Hushchanskou
  */
 public abstract class AbstractReporter implements ConcurrentEventListener {
-
+	private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReporter.class);
 	private static final String AGENT_PROPERTIES_FILE = "agent.properties";
+	private static final int DEFAULT_CAPACITY = 16;
+
+	public static final TestItemTree ITEM_TREE = new TestItemTree();
+	private static volatile ReportPortal REPORT_PORTAL = ReportPortal.builder().build();
 
 	protected Supplier<Launch> launch;
 	static final String COLON_INFIX = ": ";
 	private static final String SKIPPED_ISSUE_KEY = "skippedIssue";
-	private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReporter.class);
 
 	private final Map<String, RunningContext.FeatureContext> currentFeatureContextMap = new ConcurrentHashMap<>();
 
-	private final Map<Pair<String, String>, RunningContext.ScenarioContext> currentScenarioContextMap = new ConcurrentHashMap<>();
+	private final Map<Pair<Integer, String>, RunningContext.ScenarioContext> currentScenarioContextMap = new ConcurrentHashMap<>();
 
 	private final ThreadLocal<RunningContext.ScenarioContext> currentScenarioContext = new ThreadLocal<>();
 
@@ -76,6 +86,14 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	// This map is used to record the last scenario time and its feature uri.
 	// End of feature occurs once launch is finished.
 	private final Map<String, Date> featureEndTime = new ConcurrentHashMap<>();
+
+	public static ReportPortal getReportPortal() {
+		return REPORT_PORTAL;
+	}
+
+	protected static void setReportPortal(ReportPortal reportPortal) {
+		REPORT_PORTAL = reportPortal;
+	}
 
 	/**
 	 * Registers an event handler for a specific event.
@@ -115,7 +133,8 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 */
 	protected void beforeLaunch() {
 		startLaunch();
-		launch.get().start();
+		Maybe<String> launchId = launch.get().start();
+		ITEM_TREE.setLaunchId(launchId);
 	}
 
 	/**
@@ -136,22 +155,37 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		launch.get().finish(finishLaunchRq);
 	}
 
+	private void addToTree(RunningContext.FeatureContext featureContext, RunningContext.ScenarioContext scenarioContext) {
+		retrieveLeaf(featureContext.getUri(), ITEM_TREE).ifPresent(suiteLeaf -> suiteLeaf.getChildItems()
+				.put(createKey(scenarioContext.getLine()), TestItemTree.createTestItemLeaf(scenarioContext.getId(), DEFAULT_CAPACITY)));
+	}
+
 	/**
 	 * Start Cucumber scenario
 	 */
-	protected void beforeScenario(RunningContext.FeatureContext currentFeatureContext, RunningContext.ScenarioContext context,
+	protected void beforeScenario(RunningContext.FeatureContext featureContext, RunningContext.ScenarioContext scenarioContext,
 			String scenarioName) {
-		String description = getDescription(currentFeatureContext.getUri());
-		String codeRef = getCodeRef(currentFeatureContext.getUri(), context.getLine());
-		Maybe<String> id = Utils.startNonLeafNode(launch.get(),
-				currentFeatureContext.getFeatureId(),
+		String description = getDescription(featureContext.getUri());
+		String codeRef = getCodeRef(featureContext.getUri(), scenarioContext.getLine());
+		Launch myLaunch = launch.get();
+		Maybe<String> id = Utils.startNonLeafNode(
+				myLaunch,
+				featureContext.getFeatureId(),
 				scenarioName,
 				description,
 				codeRef,
-				context.getAttributes(),
+				scenarioContext.getAttributes(),
 				getScenarioTestItemType()
 		);
-		context.setId(id);
+		scenarioContext.setId(id);
+		if (myLaunch.getParameters().isCallbackReportingEnabled()) {
+			addToTree(featureContext, scenarioContext);
+		}
+	}
+
+	private void removeFromTree(RunningContext.FeatureContext featureContext, RunningContext.ScenarioContext scenarioContext) {
+		retrieveLeaf(featureContext.getUri(), ITEM_TREE).ifPresent(suiteLeaf -> suiteLeaf.getChildItems()
+				.remove(createKey(scenarioContext.getLine())));
 	}
 
 	/**
@@ -160,16 +194,12 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 */
 	protected void afterScenario(TestCaseFinished event) {
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
-		for (Map.Entry<Pair<String, String>, RunningContext.ScenarioContext> scenarioContext : currentScenarioContextMap.entrySet()) {
-			if (scenarioContext.getValue().getLine() == context.getLine()) {
-				currentScenarioContextMap.remove(scenarioContext.getKey());
-				Date endTime = Utils.finishTestItem(launch.get(), context.getId(), event.result.getStatus());
-				String featureURI = scenarioContext.getKey().getValue();
-				featureEndTime.put(featureURI, endTime);
-				break;
-			}
-		}
+		String featureUri = context.getFeatureUri();
+		currentScenarioContextMap.remove(Pair.of(context.getLine(), featureUri));
+		Date endTime = Utils.finishTestItem(launch.get(), context.getId(), event.result.getStatus());
+		featureEndTime.put(featureUri, endTime);
 		currentScenarioContext.set(null);
+		removeFromTree(currentFeatureContextMap.get(context.getFeatureUri()), context);
 	}
 
 	/**
@@ -213,32 +243,107 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	}
 
 	/**
+	 * Extension point to customize test creation event/request
+	 *
+	 * @param testStep a cucumber step object
+	 * @return Request to ReportPortal
+	 */
+	protected StartTestItemRQ buildStartStepRequest(TestStep testStep, String stepPrefix, String keyword) {
+		StartTestItemRQ rq = new StartTestItemRQ();
+		rq.setName(Utils.buildNodeName(stepPrefix, keyword, Utils.getStepName(testStep), ""));
+		rq.setDescription(Utils.buildMultilineArgument(testStep));
+		rq.setStartTime(Calendar.getInstance().getTime());
+		rq.setType("STEP");
+		String codeRef = Utils.getCodeRef(testStep);
+		if (testStep instanceof PickleStepTestStep) {
+			PickleStepTestStep pickleStepTestStep = (PickleStepTestStep) testStep;
+			List<Argument> arguments = pickleStepTestStep.getDefinitionArgument();
+			rq.setParameters(Utils.getParameters(codeRef, arguments));
+		}
+		rq.setCodeRef(codeRef);
+		rq.setTestCaseId(ofNullable(Utils.getTestCaseId(testStep, codeRef)).map(TestCaseIdEntry::getId).orElse(null));
+		rq.setAttributes(Utils.getAttributes(testStep));
+		return rq;
+	}
+
+	/**
 	 * Start Cucumber step
 	 *
-	 * @param step Step object
+	 * @param testStep a cucumber step object
 	 */
-	protected abstract void beforeStep(TestStep step);
+	protected void beforeStep(TestStep testStep) {
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		Step step = context.getStep(testStep);
+		StartTestItemRQ rq = buildStartStepRequest(testStep, context.getStepPrefix(), step.getKeyword());
+		Launch myLaunch = launch.get();
+		Maybe<String> stepId = myLaunch.startTestItem(context.getId(), rq);
+		context.setCurrentStepId(stepId);
+		String stepText = step.getText();
+		context.setCurrentText(stepText);
+
+		if (myLaunch.getParameters().isCallbackReportingEnabled()) {
+			addToTree(context, step.getText(), stepId);
+		}
+	}
 
 	/**
 	 * Finish Cucumber step
 	 *
 	 * @param result Step result
 	 */
-	protected abstract void afterStep(Result result);
+	protected void afterStep(Result result) {
+		reportResult(result, null);
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		Launch myLaunch = launch.get();
+		myLaunch.getStepReporter().finishPreviousStep();
+		Utils.finishTestItem(myLaunch, context.getCurrentStepId(), result.getStatus());
+		context.setCurrentStepId(null);
+	}
+
+	/**
+	 * Extension point to customize test creation event/request
+	 *
+	 * @param hookType a cucumber hook type object
+	 * @return Request to ReportPortal
+	 */
+	protected StartTestItemRQ buildStartHookRequest(HookType hookType) {
+		StartTestItemRQ rq = new StartTestItemRQ();
+		Pair<String, String> typeName = Utils.getHookTypeAndName(hookType);
+		rq.setType(typeName.getKey());
+		rq.setName(typeName.getValue());
+		rq.setStartTime(Calendar.getInstance().getTime());
+		return rq;
+	}
 
 	/**
 	 * Called when before/after-hooks are started
 	 *
 	 * @param hookType a hook type
 	 */
-	protected abstract void beforeHooks(HookType hookType);
+	protected void beforeHooks(HookType hookType) {
+		StartTestItemRQ rq = buildStartHookRequest(hookType);
+
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		context.setHookStepId(launch.get().startTestItem(getCurrentScenarioContext().getId(), rq));
+		context.setHookStatus(Result.Type.PASSED);
+	}
 
 	/**
 	 * Called when before/after-hooks are finished
 	 *
-	 * @param isBefore - if true, before-hook is finished, if false - after-hook
+	 * @param hookType a hook type
 	 */
-	protected abstract void afterHooks(Boolean isBefore);
+	protected void afterHooks(HookType hookType) {
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		Launch myLaunch = launch.get();
+		myLaunch.getStepReporter().finishPreviousStep();
+		Utils.finishTestItem(myLaunch, context.getHookStepId(), context.getHookStatus());
+		context.setHookStepId(null);
+		if (hookType == HookType.AfterStep) {
+			removeFromTree(context, context.getCurrentText());
+			context.setCurrentText(null);
+		}
+	}
 
 	/**
 	 * Called when a specific before/after-hook is finished
@@ -247,13 +352,17 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 * @param result   Hook result
 	 * @param isBefore - if true, before-hook, if false - after-hook
 	 */
-	protected abstract void hookFinished(HookTestStep step, Result result, Boolean isBefore);
+	protected void hookFinished(HookTestStep step, Result result, Boolean isBefore) {
+		reportResult(result, (isBefore ? "Before" : "After") + " hook: " + step.getCodeLocation());
+		getCurrentScenarioContext().setHookStatus(result.getStatus());
+	}
 
 	/**
 	 * Return RP launch test item name mapped to Cucumber feature
 	 *
 	 * @return test item name
 	 */
+	@Nonnull
 	protected abstract String getFeatureTestItemType();
 
 	/**
@@ -261,6 +370,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 *
 	 * @return test item name
 	 */
+	@Nonnull
 	protected abstract String getScenarioTestItemType();
 
 	/**
@@ -272,12 +382,15 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	void reportResult(Result result, String message) {
 		String cukesStatus = result.getStatus().toString();
 		String level = Utils.mapLevel(cukesStatus);
+		if (message != null) {
+			Utils.sendLog(message, level);
+		}
 		String errorMessage = result.getErrorMessage();
 		if (errorMessage != null) {
 			Utils.sendLog(errorMessage, level);
 		}
-		if (message != null) {
-			Utils.sendLog(message, level);
+		if (result.getError() != null) {
+			Utils.sendLog(getStackTraceAsString(result.getError()), level);
 		}
 	}
 
@@ -296,7 +409,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 * Send a log with data attached.
 	 *
 	 * @param mimeType an attachment type
-	 * @param data data to attach
+	 * @param data     data to attach
 	 */
 	protected void embedding(String mimeType, byte[] data) {
 		String type = mimeType;
@@ -308,7 +421,6 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		}
 		String prefix = "";
 		try {
-
 			MediaType mt = getMimeTypes().forName(type).getType();
 			prefix = mt.getType();
 		} catch (MimeTypeException e) {
@@ -325,20 +437,21 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		return HookType.Before == ((HookTestStep) step).getHookType();
 	}
 
-	protected abstract Maybe<String> getRootItemId();
+	@Nonnull
+	protected abstract Optional<Maybe<String>> getRootItemId();
 
 	private RunningContext.FeatureContext startFeatureContext(RunningContext.FeatureContext context) {
 		String featureKeyword = context.getFeature().getKeyword();
 		String featureName = context.getFeature().getName();
 		StartTestItemRQ rq = new StartTestItemRQ();
-		Maybe<String> root = getRootItemId();
 		rq.setDescription(getDescription(context.getUri()));
 		rq.setCodeRef(getCodeRef(context.getUri(), 0));
 		rq.setName(Utils.buildNodeName(featureKeyword, AbstractReporter.COLON_INFIX, featureName, null));
 		rq.setAttributes(context.getAttributes());
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType(getFeatureTestItemType());
-		context.setFeatureId(root == null ? launch.get().startTestItem(rq) : launch.get().startTestItem(root, rq));
+		Optional<Maybe<String>> root = getRootItemId();
+		context.setFeatureId(root.map(r -> launch.get().startTestItem(r, rq)).orElseGet(() -> launch.get().startTestItem(rq)));
 		return context;
 	}
 
@@ -385,41 +498,53 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		return event -> write(event.text);
 	}
 
+	private void removeFromTree(RunningContext.FeatureContext featureContext) {
+		ITEM_TREE.getTestItems().remove(createKey(featureContext.getUri()));
+	}
+
 	protected void handleEndOfFeature() {
-		for (RunningContext.FeatureContext value : currentFeatureContextMap.values()) {
-			Date featureCompletionDateTime = featureEndTime.get(value.getUri());
-			Utils.finishFeature(launch.get(), value.getFeatureId(), featureCompletionDateTime);
-		}
+		currentFeatureContextMap.values().forEach(f -> {
+			Date featureCompletionDateTime = featureEndTime.get(f.getUri());
+			Utils.finishFeature(launch.get(), f.getFeatureId(), featureCompletionDateTime);
+			removeFromTree(f);
+		});
 		currentFeatureContextMap.clear();
+	}
+
+	private void addToTree(RunningContext.FeatureContext context) {
+		ITEM_TREE.getTestItems()
+				.put(createKey(context.getUri()), TestItemTree.createTestItemLeaf(context.getFeatureId(), DEFAULT_CAPACITY));
 	}
 
 	protected void handleStartOfTestCase(TestCaseStarted event) {
 		TestCase testCase = event.testCase;
 		RunningContext.FeatureContext newFeatureContext = new RunningContext.FeatureContext(testCase);
 		String featureUri = newFeatureContext.getUri();
-		RunningContext.FeatureContext featureContext = currentFeatureContextMap.computeIfAbsent(featureUri,
-				u -> startFeatureContext(newFeatureContext)
-		);
+		RunningContext.FeatureContext featureContext = currentFeatureContextMap.computeIfAbsent(featureUri, u -> {
+			RunningContext.FeatureContext c = startFeatureContext(newFeatureContext);
+			if (launch.get().getParameters().isCallbackReportingEnabled()) {
+				addToTree(c);
+			}
+			return c;
+		});
 
 		if (!featureContext.getUri().equals(testCase.getUri())) {
 			throw new IllegalStateException("Scenario URI does not match Feature URI.");
 		}
 
 		RunningContext.ScenarioContext newScenarioContext = featureContext.getScenarioContext(testCase);
-		String scenarioName = Utils.buildNodeName(newScenarioContext.getKeyword(),
+		String scenarioName = Utils.buildNodeName(
+				newScenarioContext.getKeyword(),
 				AbstractReporter.COLON_INFIX,
 				newScenarioContext.getName(),
 				newScenarioContext.getOutlineIteration()
 		);
 
-		Pair<String, String> scenarioNameFeatureURI = Pair.of(testCase.getScenarioDesignation(), featureContext.getUri());
-		RunningContext.ScenarioContext scenarioContext = currentScenarioContextMap.get(scenarioNameFeatureURI);
-
-		if (scenarioContext == null) {
-			scenarioContext = newScenarioContext;
-			currentScenarioContextMap.put(scenarioNameFeatureURI, scenarioContext);
-			currentScenarioContext.set(scenarioContext);
-		}
+		Pair<Integer, String> scenarioLineFeatureURI = Pair.of(newScenarioContext.getLine(), featureContext.getUri());
+		RunningContext.ScenarioContext scenarioContext = currentScenarioContextMap.computeIfAbsent(scenarioLineFeatureURI, k -> {
+			currentScenarioContext.set(newScenarioContext);
+			return newScenarioContext;
+		});
 
 		beforeScenario(featureContext, scenarioContext, scenarioName);
 	}
@@ -438,10 +563,27 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 
 	protected void handleTestStepFinished(TestStepFinished event) {
 		if (event.testStep instanceof HookTestStep) {
-			hookFinished((HookTestStep) event.testStep, event.result, isBefore(event.testStep));
-			afterHooks(isBefore(event.testStep));
+			HookTestStep testStep = (HookTestStep) event.testStep;
+			hookFinished(testStep, event.result, isBefore(event.testStep));
+			afterHooks(testStep.getHookType());
 		} else {
 			afterStep(event.result);
 		}
+	}
+
+	protected void addToTree(RunningContext.ScenarioContext scenarioContext, String text, Maybe<String> stepId) {
+		retrieveLeaf(
+				scenarioContext.getFeatureUri(),
+				scenarioContext.getLine(),
+				ITEM_TREE
+		).ifPresent(scenarioLeaf -> scenarioLeaf.getChildItems().put(createKey(text), TestItemTree.createTestItemLeaf(stepId, 0)));
+	}
+
+	protected void removeFromTree(RunningContext.ScenarioContext scenarioContext, String text) {
+		retrieveLeaf(
+				scenarioContext.getFeatureUri(),
+				scenarioContext.getLine(),
+				ITEM_TREE
+		).ifPresent(scenarioLeaf -> scenarioLeaf.getChildItems().remove(createKey(text)));
 	}
 }

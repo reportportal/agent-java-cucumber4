@@ -29,7 +29,6 @@ import gherkin.ast.*;
 import gherkin.pickles.PickleTag;
 import io.reactivex.Maybe;
 
-import java.net.URI;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;

@@ -30,7 +30,6 @@ import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import cucumber.api.*;
 import cucumber.runtime.StepDefinitionMatch;
-import gherkin.ast.Step;
 import gherkin.ast.Tag;
 import gherkin.pickles.Argument;
 import gherkin.pickles.*;
@@ -400,24 +399,5 @@ public class Utils {
 				break;
 		}
 		return Pair.of(type, name);
-	}
-
-	public static StartTestItemRQ buildStartStepRequest(String stepPrefix, TestStep testStep, Step step, boolean hasStats) {
-		StartTestItemRQ rq = new StartTestItemRQ();
-		rq.setHasStats(hasStats);
-		rq.setName(Utils.buildNodeName(stepPrefix, step.getKeyword(), Utils.getStepName(testStep), ""));
-		rq.setDescription(Utils.buildMultilineArgument(testStep));
-		rq.setStartTime(Calendar.getInstance().getTime());
-		rq.setType("STEP");
-		String codeRef = Utils.getCodeRef(testStep);
-		if (testStep instanceof PickleStepTestStep) {
-			PickleStepTestStep pickleStepTestStep = (PickleStepTestStep) testStep;
-			List<cucumber.api.Argument> arguments = pickleStepTestStep.getDefinitionArgument();
-			rq.setParameters(Utils.getParameters(codeRef, arguments));
-		}
-		rq.setCodeRef(codeRef);
-		rq.setTestCaseId(ofNullable(Utils.getTestCaseId(testStep, codeRef)).map(TestCaseIdEntry::getId).orElse(null));
-		rq.setAttributes(Utils.getAttributes(testStep));
-		return rq;
 	}
 }
