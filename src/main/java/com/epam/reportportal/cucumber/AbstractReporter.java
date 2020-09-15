@@ -282,7 +282,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		context.setCurrentText(stepText);
 
 		if (myLaunch.getParameters().isCallbackReportingEnabled()) {
-			addToTree(context, step.getText(), stepId);
+			addToTree(context, stepText, stepId);
 		}
 	}
 
@@ -324,7 +324,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		StartTestItemRQ rq = buildStartHookRequest(hookType);
 
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
-		context.setHookStepId(launch.get().startTestItem(getCurrentScenarioContext().getId(), rq));
+		context.setHookStepId(launch.get().startTestItem(context.getId(), rq));
 		context.setHookStatus(Result.Type.PASSED);
 	}
 
@@ -379,7 +379,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 * @param result  - Cucumber result object
 	 * @param message - optional message to be logged in addition
 	 */
-	void reportResult(Result result, String message) {
+	protected void reportResult(Result result, String message) {
 		String cukesStatus = result.getStatus().toString();
 		String level = Utils.mapLevel(cukesStatus);
 		if (message != null) {
