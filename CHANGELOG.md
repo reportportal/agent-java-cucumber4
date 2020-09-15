@@ -1,6 +1,16 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Callback reporting
+### Changed
+- 'file:' prefix removed in CodeRef field
+- Test step parameters handling
+- Mime type processing for data embedding was improved
+### Fixed
+- Manually-reported nested steps now correctly fail all parents
+### Removed
+- Scenario Outline iteration number in item names, to not break re-runs
 
 ## [5.0.0-BETA-15]
 ### Fixed

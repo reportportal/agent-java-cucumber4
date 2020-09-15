@@ -22,16 +22,14 @@ import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.utils.AttributeParser;
+import com.epam.reportportal.utils.ParameterUtils;
 import com.epam.reportportal.utils.TestCaseIdUtils;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
 import com.epam.ta.reportportal.ws.model.ParameterResource;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
-import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
-import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
 import cucumber.api.*;
 import cucumber.runtime.StepDefinitionMatch;
-import gherkin.ast.Step;
 import gherkin.ast.Tag;
 import gherkin.pickles.Argument;
 import gherkin.pickles.*;
@@ -40,17 +38,13 @@ import io.reactivex.annotations.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import rp.com.google.common.base.Function;
 import rp.com.google.common.collect.ImmutableMap;
-import rp.com.google.common.collect.Lists;
 
 import javax.annotation.Nonnull;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -70,13 +64,13 @@ public class Utils {
 	private static final String ONE_SPACE = " ";
 	private static final String HOOK_ = "Hook: ";
 	private static final String NEW_LINE = "\r\n";
+	private static final String FILE_PREFIX = "file:";
 
 	private static final String DEFINITION_MATCH_FIELD_NAME = "definitionMatch";
 	private static final String STEP_DEFINITION_FIELD_NAME = "stepDefinition";
 	private static final String GET_LOCATION_METHOD_NAME = "getLocation";
 	private static final String METHOD_OPENING_BRACKET = "(";
 	private static final String METHOD_FIELD_NAME = "method";
-	private static final String PARAMETER_REGEX = "<[^<>]+>";
 
 	private Utils() {
 		throw new AssertionError("No instances should exist for the class!");
@@ -130,24 +124,14 @@ public class Utils {
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType(type);
 		if ("STEP".equals(type)) {
-			rq.setTestCaseId(TestCaseIdUtils.getTestCaseId(codeRef, null).getId());
+			rq.setTestCaseId(ofNullable(Utils.getTestCaseId(codeRef, null)).map(TestCaseIdEntry::getId).orElse(null));
 		}
 
 		return rp.startTestItem(rootItemId, rq);
 	}
 
-	static void sendLog(final String message, final String level, final File file) {
-		ReportPortal.emitLog((Function<String, SaveLogRQ>) itemUuid -> {
-			SaveLogRQ rq = new SaveLogRQ();
-			rq.setMessage(message);
-			rq.setItemUuid(itemUuid);
-			rq.setLevel(level);
-			rq.setLogTime(Calendar.getInstance().getTime());
-			if (file != null) {
-				rq.setFile(file);
-			}
-			return rq;
-		});
+	static void sendLog(final String message, final String level) {
+		ReportPortal.emitLog(message, level, Calendar.getInstance().getTime());
 	}
 
 	/**
@@ -218,16 +202,10 @@ public class Utils {
 	 * @param prefix   - substring to be prepended at the beginning (optional)
 	 * @param infix    - substring to be inserted between keyword and name
 	 * @param argument - main text to process
-	 * @param suffix   - substring to be appended at the end (optional)
 	 * @return transformed string
 	 */
-	//TODO: pass Node as argument, not test event
-	static String buildNodeName(String prefix, String infix, String argument, String suffix) {
-		return buildName(prefix, infix, argument, suffix);
-	}
-
-	private static String buildName(String prefix, String infix, String argument, String suffix) {
-		return (prefix == null ? EMPTY : prefix) + infix + argument + (suffix == null ? EMPTY : suffix);
+	public static String buildName(String prefix, String infix, String argument) {
+		return (prefix == null ? EMPTY : prefix) + infix + argument;
 	}
 
 	/**
@@ -316,24 +294,17 @@ public class Utils {
 
 	}
 
-	static List<ParameterResource> getParameters(List<cucumber.api.Argument> arguments, String text) {
-		List<ParameterResource> parameters = Lists.newArrayList();
-		ArrayList<String> parameterNames = Lists.newArrayList();
-		Matcher matcher = Pattern.compile(PARAMETER_REGEX).matcher(text);
-		while (matcher.find()) {
-			parameterNames.add(text.substring(matcher.start() + 1, matcher.end() - 1));
-		}
-		IntStream.range(0, parameterNames.size()).forEach(index -> {
-			String parameterName = parameterNames.get(index);
-			if (index < arguments.size()) {
-				String parameterValue = arguments.get(index).getValue();
-				ParameterResource parameterResource = new ParameterResource();
-				parameterResource.setKey(parameterName);
-				parameterResource.setValue(parameterValue);
-				parameters.add(parameterResource);
-			}
-		});
-		return parameters;
+	@Nonnull
+	public static String getCodeRef(@Nonnull String uri, int line) {
+		String myUri = uri.startsWith(FILE_PREFIX) ? uri.substring(FILE_PREFIX.length()) : uri;
+		return myUri + ":" + line;
+	}
+
+	static List<ParameterResource> getParameters(String codeRef, List<cucumber.api.Argument> arguments) {
+		List<Pair<String, String>> params = ofNullable(arguments).map(a -> IntStream.range(0, a.size())
+				.mapToObj(i -> Pair.of("arg" + i, a.get(i).getValue()))
+				.collect(Collectors.toList())).orElse(null);
+		return ParameterUtils.getParameters(codeRef, params);
 	}
 
 	private static Method retrieveMethod(Field definitionMatchField, TestStep testStep)
@@ -400,11 +371,6 @@ public class Utils {
 		return uri;
 	}
 
-	@Nonnull
-	public static String getCodeRef(@Nonnull String uri, int line) {
-		return uri + ":" + line;
-	}
-
 	public static Pair<String, String> getHookTypeAndName(HookType hookType) {
 		String name = null;
 		String type = null;
@@ -427,23 +393,5 @@ public class Utils {
 				break;
 		}
 		return Pair.of(type, name);
-	}
-
-	public static StartTestItemRQ buildStartStepRequest(String stepPrefix, TestStep testStep, Step step, boolean hasStats) {
-		StartTestItemRQ rq = new StartTestItemRQ();
-		rq.setHasStats(hasStats);
-		rq.setName(Utils.buildNodeName(stepPrefix, step.getKeyword(), Utils.getStepName(testStep), ""));
-		rq.setDescription(Utils.buildMultilineArgument(testStep));
-		rq.setStartTime(Calendar.getInstance().getTime());
-		rq.setType("STEP");
-		String codeRef = Utils.getCodeRef(testStep);
-		List<cucumber.api.Argument> arguments = testStep instanceof PickleStepTestStep ?
-				((PickleStepTestStep) testStep).getDefinitionArgument() :
-				Collections.emptyList();
-		rq.setParameters(Utils.getParameters(arguments, step.getText()));
-		rq.setCodeRef(codeRef);
-		rq.setTestCaseId(ofNullable(Utils.getTestCaseId(testStep, codeRef)).map(TestCaseIdEntry::getId).orElse(null));
-		rq.setAttributes(Utils.getAttributes(testStep));
-		return rq;
 	}
 }
