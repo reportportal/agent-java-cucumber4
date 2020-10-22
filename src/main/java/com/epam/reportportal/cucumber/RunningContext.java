@@ -15,7 +15,6 @@
  */
 package com.epam.reportportal.cucumber;
 
-import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import cucumber.api.PickleStepTestStep;
 import cucumber.api.Result;
 import cucumber.api.TestCase;
@@ -26,7 +25,6 @@ import gherkin.Parser;
 import gherkin.ParserException;
 import gherkin.TokenMatcher;
 import gherkin.ast.*;
-import gherkin.pickles.PickleTag;
 import io.reactivex.Maybe;
 
 import java.util.*;
@@ -52,14 +50,12 @@ public class RunningContext {
 		private static final Map<String, TestSourceRead> PATH_TO_READ_EVENT_MAP = new ConcurrentHashMap<>();
 		private final String currentFeatureUri;
 		private final Feature currentFeature;
-		private final Set<ItemAttributesRQ> attributes;
 		private Maybe<String> currentFeatureId;
 
 		public FeatureContext(TestCase testCase) {
 			TestSourceRead event = PATH_TO_READ_EVENT_MAP.get(testCase.getUri());
 			currentFeature = getFeature(event.source);
 			currentFeatureUri = event.uri;
-			attributes = Utils.extractAttributes(currentFeature.getTags());
 		}
 
 		public static void addTestSourceReadEvent(String path, TestSourceRead event) {
@@ -69,7 +65,6 @@ public class RunningContext {
 		public ScenarioContext getScenarioContext(TestCase testCase) {
 			ScenarioDefinition scenario = getScenario(testCase);
 			ScenarioContext context = new ScenarioContext();
-			context.processTags(testCase.getTags());
 			context.processScenario(scenario);
 			context.setTestCase(testCase);
 			context.processBackground(getBackground());
@@ -98,10 +93,6 @@ public class RunningContext {
 
 		public Feature getFeature() {
 			return currentFeature;
-		}
-
-		public Set<ItemAttributesRQ> getAttributes() {
-			return attributes;
 		}
 
 		public String getUri() {
@@ -146,7 +137,6 @@ public class RunningContext {
 
 		private final Queue<Step> backgroundSteps = new ArrayDeque<>();
 		private final Map<Integer, Step> scenarioLocationMap = new HashMap<>();
-		private Set<ItemAttributesRQ> attributes = new HashSet<>();
 		private Maybe<String> currentStepId;
 		private Maybe<String> hookStepId;
 		private Result.Type hookStatus;
@@ -175,12 +165,10 @@ public class RunningContext {
 			}
 		}
 
-		public Set<ItemAttributesRQ> getAttributes() {
-			return attributes;
-		}
-
 		/**
 		 * Takes the serial number of scenario outline and links it to the executing scenario
+		 *
+		 * @param scenarioOutline Cucumber's ScenarioDefinition object
 		 **/
 		public void processScenarioOutline(ScenarioDefinition scenarioOutline) {
 			if (isScenarioOutline(scenarioOutline)) {
@@ -194,15 +182,12 @@ public class RunningContext {
 				int iterationIdx = IntStream.range(0, scenarioOutlineMap.get(scenarioOutline).size())
 						.filter(i -> getLine() == scenarioOutlineMap.get(scenarioOutline).get(i))
 						.findFirst()
-						.orElseThrow(() -> new IllegalStateException(String.format("No outline iteration number found for scenario %s",
-								Utils.getCodeRef(uri, getLine())
+						.orElseThrow(() -> new IllegalStateException(String.format("No outline iteration number found for scenario %s:%s",
+								uri,
+								getLine()
 						)));
 				outlineIteration = String.format("[%d]", iterationIdx + 1);
 			}
-		}
-
-		public void processTags(List<PickleTag> pickleTags) {
-			attributes = Utils.extractPickleTags(pickleTags);
 		}
 
 		public void mapBackgroundSteps(Background background) {
@@ -312,6 +297,10 @@ public class RunningContext {
 
 		public String getCurrentText() {
 			return text;
+		}
+
+		public TestCase getTestCase() {
+			return testCase;
 		}
 	}
 }
