@@ -760,7 +760,8 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 * @return - transformed multiline argument (or empty string if there is
 	 * none)
 	 */
-	protected String buildMultilineArgument(TestStep step) {
+	@Nonnull
+	protected String buildMultilineArgument(@Nonnull TestStep step) {
 		List<PickleRow> table = null;
 		String dockString = EMPTY;
 		StringBuilder marg = new StringBuilder();

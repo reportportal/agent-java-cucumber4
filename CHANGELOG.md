@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Missed annotations
 
 ## [5.0.0]
 ### Added
