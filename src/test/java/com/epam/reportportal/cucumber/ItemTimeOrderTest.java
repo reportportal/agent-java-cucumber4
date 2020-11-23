@@ -105,13 +105,18 @@ public class ItemTimeOrderTest {
 		ArgumentCaptor<StartTestItemRQ> itemCaptor = ArgumentCaptor.forClass(StartTestItemRQ.class);
 		verify(client).startTestItem(itemCaptor.capture());
 		verify(client).startTestItem(same(suiteId), itemCaptor.capture());
-		verify(client, times(3)).startTestItem(same(testId), itemCaptor.capture());
+		ArgumentCaptor<StartTestItemRQ> stepCaptor = ArgumentCaptor.forClass(StartTestItemRQ.class);
+		verify(client, times(3)).startTestItem(same(testId), stepCaptor.capture());
 
 		Date startTime = launchCaptor.getValue().getStartTime();
 		List<StartTestItemRQ> items = itemCaptor.getAllValues();
 		for (StartTestItemRQ item : items) {
 			assertThat(item.getStartTime(), allOf(notNullValue(), greaterThanOrEqualTo(startTime)));
 			startTime = item.getStartTime();
+		}
+
+		for (StartTestItemRQ step : stepCaptor.getAllValues()) {
+			assertThat(step.getStartTime(), allOf(notNullValue(), greaterThanOrEqualTo(startTime)));
 		}
 	}
 }
