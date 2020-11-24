@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Support of cucumber versions lower that 4.4.0
 
 ## [5.0.1]
 ### Added

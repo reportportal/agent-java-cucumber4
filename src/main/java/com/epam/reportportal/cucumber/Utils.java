@@ -16,50 +16,58 @@
 package com.epam.reportportal.cucumber;
 
 import com.epam.reportportal.listeners.ItemStatus;
+import com.epam.reportportal.listeners.LogLevel;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
 import cucumber.runtime.StepDefinitionMatch;
-import rp.com.google.common.collect.ImmutableMap;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Optional.ofNullable;
 
 public class Utils {
 	private static final String EMPTY = "";
-
 	private static final String DEFINITION_MATCH_FIELD_NAME = "definitionMatch";
 	private static final String STEP_DEFINITION_FIELD_NAME = "stepDefinition";
-
 	private static final String METHOD_FIELD_NAME = "method";
 
 	private Utils() {
 		throw new AssertionError("No instances should exist for the class!");
 	}
 
-	//@formatter:off
-	public static final Map<Result.Type, ItemStatus> STATUS_MAPPING = ImmutableMap.<Result.Type, ItemStatus>builder()
-            .put(Result.Type.PASSED, ItemStatus.PASSED)
-            .put(Result.Type.FAILED, ItemStatus.FAILED)
-            .put(Result.Type.SKIPPED, ItemStatus.SKIPPED)
-            .put(Result.Type.PENDING, ItemStatus.SKIPPED)
-            .put(Result.Type.AMBIGUOUS, ItemStatus.SKIPPED)
-            .put(Result.Type.UNDEFINED, ItemStatus.SKIPPED)
-            .put(Result.Type.UNUSED, ItemStatus.SKIPPED).build();
+	private static final Map<Result.Type, ItemStatus> COMMON_STATUS_MAPPING = new HashMap<Result.Type, ItemStatus>() {{
+		put(Result.Type.PASSED, ItemStatus.PASSED);
+		put(Result.Type.FAILED, ItemStatus.FAILED);
+		put(Result.Type.SKIPPED, ItemStatus.SKIPPED);
+		put(Result.Type.PENDING, ItemStatus.SKIPPED);
+		put(Result.Type.AMBIGUOUS, ItemStatus.SKIPPED);
+		put(Result.Type.UNDEFINED, ItemStatus.SKIPPED);
+	}};
 
-	public static final Map<Result.Type, String> LOG_LEVEL_MAPPING = ImmutableMap.<Result.Type, String>builder()
-			.put(Result.Type.PASSED, "INFO")
-			.put(Result.Type.FAILED, "ERROR")
-			.put(Result.Type.SKIPPED, "WARN")
-			.put(Result.Type.PENDING, "WARN")
-			.put(Result.Type.AMBIGUOUS, "WARN")
-			.put(Result.Type.UNDEFINED, "WARN")
-			.put(Result.Type.UNUSED, "WARN").build();
-    //@formatter:on
+	private static final Map<Result.Type, String> COMMON_LOG_LEVEL_MAPPING = new HashMap<Result.Type, String>() {{
+		put(Result.Type.PASSED, LogLevel.INFO.name());
+		put(Result.Type.FAILED, LogLevel.ERROR.name());
+		put(Result.Type.SKIPPED, LogLevel.WARN.name());
+		put(Result.Type.PENDING, LogLevel.WARN.name());
+		put(Result.Type.AMBIGUOUS, LogLevel.WARN.name());
+		put(Result.Type.UNDEFINED, LogLevel.WARN.name());
+	}};
+
+	public static final Map<Result.Type, ItemStatus> STATUS_MAPPING;
+	public static final Map<Result.Type, String> LOG_LEVEL_MAPPING;
+
+	static {
+		Optional<Result.Type> unused = Arrays.stream(Result.Type.values()).filter(e -> "UNUSED".equals(e.name())).findAny();
+		if (unused.isPresent()) {
+			COMMON_STATUS_MAPPING.put(unused.get(), ItemStatus.SKIPPED);
+			COMMON_LOG_LEVEL_MAPPING.put(unused.get(), LogLevel.WARN.name());
+		}
+		STATUS_MAPPING = Collections.unmodifiableMap(COMMON_STATUS_MAPPING);
+		LOG_LEVEL_MAPPING = Collections.unmodifiableMap(COMMON_LOG_LEVEL_MAPPING);
+	}
 
 	/**
 	 * Generate name representation
