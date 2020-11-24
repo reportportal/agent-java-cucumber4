@@ -44,6 +44,7 @@ import gherkin.ast.Tag;
 import gherkin.pickles.*;
 import io.reactivex.Maybe;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.text.StringEscapeUtils;
 import org.apache.tika.Tika;
 import org.apache.tika.mime.MediaType;
 import org.apache.tika.mime.MimeTypeException;
@@ -441,14 +442,13 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	protected void reportResult(Result result, String message) {
 		String level = mapLevel(result.getStatus());
 		if (message != null) {
-			sendLog(message, level);
+			sendLog(StringEscapeUtils.escapeHtml4(message), level);
 		}
 		String errorMessage = result.getErrorMessage();
 		if (errorMessage != null) {
-			sendLog(errorMessage, level);
-		}
-		if (result.getError() != null) {
-			sendLog(getStackTraceAsString(result.getError()), level);
+			sendLog(StringEscapeUtils.escapeHtml4(errorMessage), level);
+		} else if (result.getError() != null) {
+			sendLog(StringEscapeUtils.escapeHtml4(getStackTraceAsString(result.getError())), level);
 		}
 	}
 
@@ -604,8 +604,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	}
 
 	private void addToTree(RunningContext.FeatureContext context) {
-		ITEM_TREE.getTestItems()
-				.put(createKey(context.getUri()), TestItemTree.createTestItemLeaf(context.getFeatureId()));
+		ITEM_TREE.getTestItems().put(createKey(context.getUri()), TestItemTree.createTestItemLeaf(context.getFeatureId()));
 	}
 
 	protected void handleStartOfTestCase(TestCaseStarted event) {
