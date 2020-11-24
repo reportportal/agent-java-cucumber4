@@ -85,7 +85,6 @@ import static rp.com.google.common.base.Throwables.getStackTraceAsString;
 public abstract class AbstractReporter implements ConcurrentEventListener {
 	private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReporter.class);
 	private static final String AGENT_PROPERTIES_FILE = "agent.properties";
-	private static final int DEFAULT_CAPACITY = 16;
 	private static final String STEP_DEFINITION_FIELD_NAME = "stepDefinition";
 	private static final String GET_LOCATION_METHOD_NAME = "getLocation";
 	private static final String METHOD_OPENING_BRACKET = "(";
@@ -186,7 +185,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 
 	private void addToTree(RunningContext.FeatureContext featureContext, RunningContext.ScenarioContext scenarioContext) {
 		retrieveLeaf(featureContext.getUri(), ITEM_TREE).ifPresent(suiteLeaf -> suiteLeaf.getChildItems()
-				.put(createKey(scenarioContext.getLine()), TestItemTree.createTestItemLeaf(scenarioContext.getId(), DEFAULT_CAPACITY)));
+				.put(createKey(scenarioContext.getLine()), TestItemTree.createTestItemLeaf(scenarioContext.getId())));
 	}
 
 	/**
@@ -447,8 +446,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		String errorMessage = result.getErrorMessage();
 		if (errorMessage != null) {
 			sendLog(errorMessage, level);
-		}
-		if (result.getError() != null) {
+		} else if (result.getError() != null) {
 			sendLog(getStackTraceAsString(result.getError()), level);
 		}
 	}
@@ -546,8 +544,8 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	}
 
 	private RunningContext.FeatureContext startFeatureContext(RunningContext.FeatureContext context) {
-		StartTestItemRQ rq = buildStartFeatureRequest(context.getFeature(), context.getUri());
 		Optional<Maybe<String>> root = getRootItemId();
+		StartTestItemRQ rq = buildStartFeatureRequest(context.getFeature(), context.getUri());
 		context.setFeatureId(root.map(r -> launch.get().startTestItem(r, rq)).orElseGet(() -> launch.get().startTestItem(rq)));
 		return context;
 	}
@@ -605,8 +603,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	}
 
 	private void addToTree(RunningContext.FeatureContext context) {
-		ITEM_TREE.getTestItems()
-				.put(createKey(context.getUri()), TestItemTree.createTestItemLeaf(context.getFeatureId(), DEFAULT_CAPACITY));
+		ITEM_TREE.getTestItems().put(createKey(context.getUri()), TestItemTree.createTestItemLeaf(context.getFeatureId()));
 	}
 
 	protected void handleStartOfTestCase(TestCaseStarted event) {
@@ -662,7 +659,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		retrieveLeaf(scenarioContext.getFeatureUri(),
 				scenarioContext.getLine(),
 				ITEM_TREE
-		).ifPresent(scenarioLeaf -> scenarioLeaf.getChildItems().put(createKey(text), TestItemTree.createTestItemLeaf(stepId, 0)));
+		).ifPresent(scenarioLeaf -> scenarioLeaf.getChildItems().put(createKey(text), TestItemTree.createTestItemLeaf(stepId)));
 	}
 
 	protected void removeFromTree(RunningContext.ScenarioContext scenarioContext, String text) {
@@ -760,7 +757,8 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 * @return - transformed multiline argument (or empty string if there is
 	 * none)
 	 */
-	protected String buildMultilineArgument(TestStep step) {
+	@Nonnull
+	protected String buildMultilineArgument(@Nonnull TestStep step) {
 		List<PickleRow> table = null;
 		String dockString = EMPTY;
 		StringBuilder marg = new StringBuilder();
