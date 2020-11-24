@@ -44,7 +44,6 @@ import gherkin.ast.Tag;
 import gherkin.pickles.*;
 import io.reactivex.Maybe;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.commons.text.StringEscapeUtils;
 import org.apache.tika.Tika;
 import org.apache.tika.mime.MediaType;
 import org.apache.tika.mime.MimeTypeException;
@@ -442,13 +441,13 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	protected void reportResult(Result result, String message) {
 		String level = mapLevel(result.getStatus());
 		if (message != null) {
-			sendLog(StringEscapeUtils.escapeHtml4(message), level);
+			sendLog(message, level);
 		}
 		String errorMessage = result.getErrorMessage();
 		if (errorMessage != null) {
-			sendLog(StringEscapeUtils.escapeHtml4(errorMessage), level);
+			sendLog(errorMessage, level);
 		} else if (result.getError() != null) {
-			sendLog(StringEscapeUtils.escapeHtml4(getStackTraceAsString(result.getError())), level);
+			sendLog(getStackTraceAsString(result.getError()), level);
 		}
 	}
 
