@@ -3,6 +3,10 @@
 ## [Unreleased]
 ### Added
 - Support of cucumber versions lower that 4.4.0
+### Changed
+- Client version updated on [5.0.16](https://github.com/reportportal/client-java/releases/tag/5.0.16)
+### Fixed
+- Empty interrupted suite in case of duplicate step
 
 ## [5.0.1]
 ### Added
