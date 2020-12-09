@@ -92,6 +92,9 @@ public class DuplicateStepTest {
 		verify(client, times(0)).startTestItem(same(testIds.get(0)), any());
 		ArgumentCaptor<FinishExecutionRQ> finishCapture = ArgumentCaptor.forClass(FinishExecutionRQ.class);
 		verify(client, times(1)).finishLaunch(any(), finishCapture.capture());
+
+		FinishExecutionRQ finishRq = finishCapture.getValue();
+		assertThat(finishRq.getEndTime(), notNullValue());
 	}
 
 	@Test
