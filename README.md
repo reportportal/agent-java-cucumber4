@@ -1,5 +1,9 @@
 # Reportportal agent for Cucumber v.4
 
+> **DISCLAIMER**: We use Google Analytics for sending anonymous usage information such as agent's and client's names, and their versions
+> after a successful launch start. This information might help us to improve both ReportPortal backend and client sides. It is used by the
+> ReportPortal team only and is not supposed for sharing with 3rd parties.
+
 [ ![Download](https://api.bintray.com/packages/epam/reportportal/agent-java-cucumber4/images/download.svg) ](https://bintray.com/epam/reportportal/agent-java-cucumber4/_latestVersion)
 
 ![CI Build](https://github.com/reportportal/agent-java-cucumber4/workflows/CI%20Build/badge.svg)
