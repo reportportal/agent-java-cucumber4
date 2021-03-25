@@ -270,9 +270,9 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 				rq.setName(parameters.getLaunchName());
 				rq.setStartTime(startTime);
 				rq.setMode(parameters.getLaunchRunningMode());
-				rq.setAttributes(parameters.getAttributes());
-				rq.getAttributes()
-						.addAll(SystemAttributesExtractor.extract(AGENT_PROPERTIES_FILE, AbstractReporter.class.getClassLoader()));
+				Set<ItemAttributesRQ> attributes = new HashSet<>(parameters.getAttributes());
+				rq.setAttributes(attributes);
+				attributes.addAll(SystemAttributesExtractor.extract(AGENT_PROPERTIES_FILE, AbstractReporter.class.getClassLoader()));
 				rq.setDescription(parameters.getDescription());
 				rq.setRerun(parameters.isRerun());
 				if (isNotBlank(parameters.getRerunOf())) {
@@ -284,7 +284,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 					skippedIssueAttribute.setKey(SKIPPED_ISSUE_KEY);
 					skippedIssueAttribute.setValue(parameters.getSkippedAnIssue().toString());
 					skippedIssueAttribute.setSystem(true);
-					rq.getAttributes().add(skippedIssueAttribute);
+					attributes.add(skippedIssueAttribute);
 				}
 
 				return reportPortal.newLaunch(rq);
@@ -462,28 +462,52 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		return mimeTypes;
 	}
 
+	@Nullable
+	private static String getDataType(byte[] data) {
+		try {
+			return TIKA_THREAD_LOCAL.get().detect(new ByteArrayInputStream(data));
+		} catch (IOException e) {
+			// nothing to do we will use bypassed mime type
+			LOGGER.warn("Mime-type not found", e);
+		}
+		return null;
+	}
+
+	/**
+	 * Send a log with data attached.
+	 *
+	 * @param name     attachment name
+	 * @param mimeType attachment type
+	 * @param data     data to attach
+	 */
+	protected void embedding(@Nullable String name, String mimeType, byte[] data) {
+		String type = ofNullable(getDataType(data)).orElse(mimeType);
+		String attachmentName = ofNullable(name).filter(m -> !m.isEmpty()).orElseGet(() -> {
+			try {
+				MediaType mt = getMimeTypes().forName(type).getType();
+				return mt.getType();
+			} catch (MimeTypeException e) {
+				LOGGER.warn("Mime-type not found", e);
+			}
+			return "";
+		});
+
+		ReportPortal.emitLog(new ReportPortalMessage(ByteSource.wrap(data), type, attachmentName),
+				"UNKNOWN",
+				Calendar.getInstance().getTime()
+		);
+	}
+
 	/**
 	 * Send a log with data attached.
 	 *
 	 * @param mimeType an attachment type
 	 * @param data     data to attach
+	 * @deprecated use {@link #embedding(String, String, byte[])}
 	 */
+	@Deprecated
 	protected void embedding(String mimeType, byte[] data) {
-		String type = mimeType;
-		try {
-			type = TIKA_THREAD_LOCAL.get().detect(new ByteArrayInputStream(data));
-		} catch (IOException e) {
-			// nothing to do we will use bypassed mime type
-			LOGGER.warn("Mime-type not found", e);
-		}
-		String prefix = "";
-		try {
-			MediaType mt = getMimeTypes().forName(type).getType();
-			prefix = mt.getType();
-		} catch (MimeTypeException e) {
-			LOGGER.warn("Mime-type not found", e);
-		}
-		ReportPortal.emitLog(new ReportPortalMessage(ByteSource.wrap(data), type, prefix), "UNKNOWN", Calendar.getInstance().getTime());
+		embedding(null, mimeType, data);
 	}
 
 	/**
@@ -582,7 +606,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	}
 
 	protected EventHandler<EmbedEvent> getEmbedEventHandler() {
-		return event -> embedding(event.mimeType, event.data);
+		return event -> embedding(event.name, event.mimeType, event.data);
 	}
 
 	protected EventHandler<WriteEvent> getWriteEventHandler() {
