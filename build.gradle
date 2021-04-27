@@ -25,8 +25,8 @@ sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
 
 repositories {
-    jcenter()
-    maven { url "http://dl.bintray.com/epam/reportportal" }
+    mavenLocal()
+    mavenCentral()
     maven { url "https://jitpack.io" }
 }
 
