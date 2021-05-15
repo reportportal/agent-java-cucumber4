@@ -35,14 +35,16 @@ import com.epam.ta.reportportal.ws.model.ParameterResource;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
-import cucumber.api.Argument;
 import cucumber.api.*;
 import cucumber.api.event.*;
 import cucumber.runtime.StepDefinitionMatch;
 import gherkin.ast.Feature;
 import gherkin.ast.Step;
 import gherkin.ast.Tag;
-import gherkin.pickles.*;
+import gherkin.pickles.PickleCell;
+import gherkin.pickles.PickleString;
+import gherkin.pickles.PickleTable;
+import gherkin.pickles.PickleTag;
 import io.reactivex.Maybe;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.tika.Tika;
@@ -90,12 +92,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	private static final String METHOD_OPENING_BRACKET = "(";
 	private static final String FILE_PREFIX = "file:";
 	private static final String HOOK_ = "Hook: ";
-	private static final String TABLE_INDENT = "          ";
-	private static final String TABLE_SEPARATOR = "|";
 	private static final String DOCSTRING_DECORATOR = "\n\"\"\"\n";
-	private static final String EMPTY = "";
-	private static final String ONE_SPACE = " ";
-	private static final String NEW_LINE = "\r\n";
 
 	public static final TestItemTree ITEM_TREE = new TestItemTree();
 	private static volatile ReportPortal REPORT_PORTAL = ReportPortal.builder().build();
@@ -775,6 +772,17 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	}
 
 	/**
+	 * Converts a table represented as List of Lists to a formatted table string
+	 *
+	 * @param table a table object
+	 * @return string representation of the table
+	 */
+	@Nonnull
+	protected String formatDataTable(@Nonnull final List<List<String>> table) {
+		return Utils.formatDataTable(table);
+	}
+
+	/**
 	 * Generate multiline argument (DataTable or DocString) representation
 	 *
 	 * @param step - Cucumber step object
@@ -783,31 +791,28 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 */
 	@Nonnull
 	protected String buildMultilineArgument(@Nonnull TestStep step) {
-		List<PickleRow> table = null;
-		String dockString = EMPTY;
-		StringBuilder marg = new StringBuilder();
+		List<List<String>> table = null;
+		String docString = null;
 		PickleStepTestStep pickleStep = (PickleStepTestStep) step;
 		if (!pickleStep.getStepArgument().isEmpty()) {
 			gherkin.pickles.Argument argument = pickleStep.getStepArgument().get(0);
 			if (argument instanceof PickleString) {
-				dockString = ((PickleString) argument).getContent();
+				docString = ((PickleString) argument).getContent();
 			} else if (argument instanceof PickleTable) {
-				table = ((PickleTable) argument).getRows();
-			}
-		}
-		if (table != null) {
-			marg.append(NEW_LINE);
-			for (PickleRow row : table) {
-				marg.append(TABLE_INDENT).append(TABLE_SEPARATOR);
-				for (PickleCell cell : row.getCells()) {
-					marg.append(ONE_SPACE).append(cell.getValue()).append(ONE_SPACE).append(TABLE_SEPARATOR);
-				}
-				marg.append(NEW_LINE);
+				table = ((PickleTable) argument).getRows()
+						.stream()
+						.map(r -> r.getCells().stream().map(PickleCell::getValue).collect(Collectors.toList()))
+						.collect(Collectors.toList());
 			}
 		}
 
-		if (!dockString.isEmpty()) {
-			marg.append(DOCSTRING_DECORATOR).append(dockString).append(DOCSTRING_DECORATOR);
+		StringBuilder marg = new StringBuilder();
+		if (table != null) {
+			marg.append(formatDataTable(table));
+		}
+
+		if (docString != null) {
+			marg.append(DOCSTRING_DECORATOR).append(docString).append(DOCSTRING_DECORATOR);
 		}
 		return marg.toString();
 	}
@@ -959,7 +964,17 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 				.collect(Collectors.toList())).orElse(Collections.emptyList());
 		params.addAll(ofNullable(pickleStepTestStep.getPickleStep().getArgument()).map(a -> IntStream.range(0, a.size()).mapToObj(i -> {
 			gherkin.pickles.Argument arg = a.get(i);
-			String value = arg instanceof PickleString ? ((PickleString) arg).getContent() : arg.toString();
+			String value;
+			if (arg instanceof PickleString) {
+				value = ((PickleString) arg).getContent();
+			} else if (arg instanceof PickleTable) {
+				value = formatDataTable(((PickleTable) arg).getRows()
+						.stream()
+						.map(r -> r.getCells().stream().map(PickleCell::getValue).collect(Collectors.toList()))
+						.collect(Collectors.toList()));
+			} else {
+				value = arg.toString();
+			}
 			return Pair.of("arg" + i, value);
 		}).collect(Collectors.toList())).orElse(Collections.emptyList()));
 		return ParameterUtils.getParameters(codeRef, params);
