@@ -71,5 +71,28 @@ jobs:
           echo "NEXUS_REPOSITORY_NAME=`echo ${NEXUS_REPOSITORY} | sed -E 's/(.+)\/([^\/]+)$/\2/'`" >> $GITHUB_ENV
 
       - name: Promote package
+        env:
+          ATTEMPTS: 60
         run: |
-          echo "${NEXUS_REPOSITORY_NAME}"
+          for i in `seq 0 ${ATTEMPTS}`; do
+            curl -u ${{ secrets.SONATYPE_USER }}:${{ secrets.SONATYPE_PASSWORD }} -L \
+              --header 'Accept: application/json' \
+              ${{ env.UPSTREAM_REPOSITORY_URL }}service/local/staging/repository/${NEXUS_REPOSITORY_NAME} >result.json
+
+            result=`jq -r '.type' result.json`
+
+            if [["$result" == "closed"]]; then
+              verified=true
+              break
+            fi
+          done
+          if verified; then
+            echo "A bundle was verified, releasing"
+            curl -u ${{ secrets.SONATYPE_USER }}:${{ secrets.SONATYPE_PASSWORD }} -L \
+              --header 'Content-Type: application/json' \
+              --data-raw "{\"data\":{\"stagedRepositoryIds\":[\"${NEXUS_REPOSITORY_NAME}\"],"description":"Releasing ${{ github.event.inputs.version }}"}}" \
+              ${{ env.UPSTREAM_REPOSITORY_URL }}service/local/staging/bulk/promote
+          else
+            echo "Verification failed, please check the bundle"
+            exit 1
+          fi
