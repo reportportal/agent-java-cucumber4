@@ -87,7 +87,7 @@ jobs:
               break
             fi
           done
-          if verified; then
+          if $verified; then
             echo "A bundle was verified, releasing"
             curl -u ${{ secrets.SONATYPE_USER }}:${{ secrets.SONATYPE_PASSWORD }} -L \
               --header 'Content-Type: application/json' \
