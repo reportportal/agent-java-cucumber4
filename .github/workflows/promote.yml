@@ -64,7 +64,8 @@ jobs:
             --request POST '${{ env.UPSTREAM_REPOSITORY_URL }}service/local/staging/bundle_upload' \
             --form "file=@${BUNDLE_FILE}" \
             | jq '.repositoryUris[0]' \
-            | read NEXUS_REPOSITORY >> $GITHUB_ENV
+            | read r
+          echo "NEXUS_REPOSITORY=${r}" >> $GITHUB_ENV
 
       - name: Promote package
         run: |
