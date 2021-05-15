@@ -66,6 +66,10 @@ jobs:
             | jq -r '.repositoryUris[0]' \
             | (read r; echo "NEXUS_REPOSITORY=${r}" >> $GITHUB_ENV)
 
+      - name: Get repository variables
+        run: |
+          echo "NEXUS_REPOSITORY_NAME=`echo ${NEXUS_REPOSITORY} | sed -E 's/\/((.)+)$/\1/p'`" >> $GITHUB_ENV
+
       - name: Promote package
         run: |
-          echo "${NEXUS_REPOSITORY}"
+          echo "${NEXUS_REPOSITORY_NAME}"
