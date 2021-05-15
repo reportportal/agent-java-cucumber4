@@ -74,6 +74,7 @@ jobs:
         env:
           ATTEMPTS: 60
         run: |
+          verified=false
           for i in `seq 0 ${ATTEMPTS}`; do
             curl -u ${{ secrets.SONATYPE_USER }}:${{ secrets.SONATYPE_PASSWORD }} -L \
               --header 'Accept: application/json' \
