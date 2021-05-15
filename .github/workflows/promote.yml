@@ -68,7 +68,7 @@ jobs:
 
       - name: Get repository variables
         run: |
-          echo "NEXUS_REPOSITORY_NAME=`echo ${NEXUS_REPOSITORY} | sed -E 's/\/((.)+)$/\1/p'`" >> $GITHUB_ENV
+          echo "NEXUS_REPOSITORY_NAME=`echo ${NEXUS_REPOSITORY} | sed -E 's/(.+)\/([^\/]+)$/\2/'`" >> $GITHUB_ENV
 
       - name: Promote package
         run: |
