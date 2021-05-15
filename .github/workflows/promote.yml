@@ -90,7 +90,7 @@ jobs:
             echo "A bundle was verified, releasing"
             curl -u ${{ secrets.SONATYPE_USER }}:${{ secrets.SONATYPE_PASSWORD }} -L \
               --header 'Content-Type: application/json' \
-              --data-raw "{\"data\":{\"stagedRepositoryIds\":[\"${NEXUS_REPOSITORY_NAME}\"],"description":"Releasing ${{ github.event.inputs.version }}"}}" \
+              --data-raw "{\"data\":{\"stagedRepositoryIds\":[\"${NEXUS_REPOSITORY_NAME}\"], \"description\":\"Releasing ${{ github.event.inputs.version }}\"}}" \
               ${{ env.UPSTREAM_REPOSITORY_URL }}service/local/staging/bulk/promote
           else
             echo "Verification failed, please check the bundle"
