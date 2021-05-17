@@ -49,7 +49,7 @@ jobs:
           for f in ${files[@]}; do
             export URL="${{ env.REPOSITORY_URL }}${{ github.repository }}/${PACKAGE_PATH}/${ARTIFACT}/${{ github.event.inputs.version }}/${ARTIFACT}-${{ github.event.inputs.version }}${f}"
             echo "Downloading artifact: ${URL}"
-            curl -u ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} -s -O -L "${URL}"
+            curl -f -u ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} -s -O -L "${URL}"
           done
           files=($(ls))
           echo 'Files downloaded:'
@@ -73,16 +73,20 @@ jobs:
       - name: Promote package
         env:
           ATTEMPTS: 60
+          SLEEP_TIME: 10
         run: |
           verified=false
           for i in `seq 0 ${ATTEMPTS}`; do
-            curl -u ${{ secrets.SONATYPE_USER }}:${{ secrets.SONATYPE_PASSWORD }} -L \
+            sleep $SLEEP_TIME
+            curl -f -s -u ${{ secrets.SONATYPE_USER }}:${{ secrets.SONATYPE_PASSWORD }} -L \
               --header 'Accept: application/json' \
               ${{ env.UPSTREAM_REPOSITORY_URL }}service/local/staging/repository/${NEXUS_REPOSITORY_NAME} >result.json
 
-            result=`jq -r '.type' result.json`
+            is_closed=`jq -r '.type' result.json`
+            is_transitioning=`jq -r '.transitioning' result.json`
+            echo "Current repository status: $is_closed; transitioning: $is_transitioning"
 
-            if [["$result" == "closed"]]; then
+            if [[ "$is_closed" == "closed" && "$is_transitioning" == "false" ]]; then
               verified=true
               break
             fi
