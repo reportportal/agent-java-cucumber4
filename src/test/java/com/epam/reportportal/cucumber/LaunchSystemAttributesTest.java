@@ -1,7 +1,6 @@
 package com.epam.reportportal.cucumber;
 
 import com.epam.reportportal.cucumber.integration.util.TestUtils;
-import com.epam.reportportal.listeners.ListenerParameters;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.ReportPortalClient;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
@@ -13,8 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import rp.com.google.common.collect.Lists;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,9 +37,6 @@ public class LaunchSystemAttributesTest {
 
 	@Mock
 	private ReportPortalClient reportPortalClient;
-
-	@Mock
-	private ListenerParameters listenerParameters;
 
 	@BeforeAll
 	public static void initKeys() {
@@ -69,6 +65,7 @@ public class LaunchSystemAttributesTest {
 
 		stepReporter.beforeLaunch();
 
+		//noinspection ResultOfMethodCallIgnored
 		stepReporter.launch.get().start().blockingGet();
 
 		ArgumentCaptor<StartLaunchRQ> launchRQArgumentCaptor = ArgumentCaptor.forClass(StartLaunchRQ.class);
@@ -78,7 +75,7 @@ public class LaunchSystemAttributesTest {
 
 		assertThat(startLaunchRequest.getAttributes(), notNullValue());
 
-		List<ItemAttributesRQ> attributes = Lists.newArrayList(startLaunchRequest.getAttributes());
+		List<ItemAttributesRQ> attributes = new ArrayList<>(startLaunchRequest.getAttributes());
 
 		for (int index = 0; index < attributes.size(); index++) {
 			if (SKIPPED_ISSUE_KEY.equals(attributes.get(index).getKey())) {
