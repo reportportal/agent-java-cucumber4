@@ -1,6 +1,11 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- Client version updated on [5.1.0-RC-4](https://github.com/reportportal/client-java/releases/tag/5.1.0-RC-4)
+- Version changed on 5.1.0
+### Fixed
+- Scenario outlines with dynamic names support
 
 ## [5.0.3]
 ### Fixed
