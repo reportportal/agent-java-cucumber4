@@ -211,8 +211,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 * @param scenarioContext current scenario context
 	 */
 	protected void beforeScenario(RunningContext.FeatureContext featureContext, RunningContext.ScenarioContext scenarioContext) {
-		String scenarioName = Utils.buildName(
-				scenarioContext.getKeyword(),
+		String scenarioName = Utils.buildName(scenarioContext.getKeyword(),
 				AbstractReporter.COLON_INFIX,
 				scenarioContext.getTestCase().getName()
 		);
@@ -860,9 +859,9 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 */
 	@Nullable
 	protected String getCodeRef(@Nonnull TestStep testStep) {
-		return ofNullable(getDefinitionMatchField(testStep)).flatMap(definitionMatchField ->{
+		return ofNullable(getDefinitionMatchField(testStep)).flatMap(match -> {
 			try {
-				StepDefinitionMatch stepDefinitionMatch = (StepDefinitionMatch) definitionMatchField.get(testStep);
+				StepDefinitionMatch stepDefinitionMatch = (StepDefinitionMatch) match.get(testStep);
 				Field stepDefinitionField = stepDefinitionMatch.getClass().getDeclaredField(STEP_DEFINITION_FIELD_NAME);
 				stepDefinitionField.setAccessible(true);
 				Object javaStepDefinition = stepDefinitionField.get(stepDefinitionMatch);
