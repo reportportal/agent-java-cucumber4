@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- Probable agent crash on cucumber-groovy
 
 ## [5.1.0-RC-2]
 ### Changed
