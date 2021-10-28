@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Feature / Scenario / Step / Hook start methods which are overridable
+- JSR-305 annotations
+- `buildFinishTestItemRequest` overridable method
 
 ## [5.1.0-RC-3]
 ### Fixed
