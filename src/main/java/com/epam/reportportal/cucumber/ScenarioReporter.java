@@ -97,7 +97,7 @@ public class ScenarioReporter extends AbstractReporter {
 	@Override
 	@Nonnull
 	protected Optional<Maybe<String>> getRootItemId() {
-		return Optional.of(rootSuiteId.get());
+		return Optional.ofNullable(rootSuiteId.get());
 	}
 
 	@Override
