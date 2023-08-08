@@ -1,7 +1,7 @@
 # ReportPortal agent for Cucumber v.4
 
 > **DISCLAIMER**: We use Google Analytics for sending anonymous usage information such as agent's and client's names,
-> and their versions after a successful launch start. This information might help us to improve both Report Portal
+> and their versions after a successful launch start. This information might help us to improve both ReportPortal
 > backend and client sides. It is used by the ReportPortal team only and is not supposed for sharing with 3rd parties.
 
 [![Maven Central](https://img.shields.io/maven-central/v/com.epam.reportportal/agent-java-cucumber4.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/com.epam.reportportal/agent-java-cucumber4)
