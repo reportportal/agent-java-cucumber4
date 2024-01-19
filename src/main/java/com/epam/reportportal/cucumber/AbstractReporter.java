@@ -18,6 +18,7 @@ package com.epam.reportportal.cucumber;
 import com.epam.reportportal.annotations.TestCaseId;
 import com.epam.reportportal.annotations.attribute.Attributes;
 import com.epam.reportportal.listeners.ItemStatus;
+import com.epam.reportportal.listeners.ItemType;
 import com.epam.reportportal.listeners.ListenerParameters;
 import com.epam.reportportal.message.ReportPortalMessage;
 import com.epam.reportportal.service.Launch;
@@ -25,6 +26,8 @@ import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.service.tree.TestItemTree;
 import com.epam.reportportal.utils.*;
+import com.epam.reportportal.utils.files.ByteSource;
+import com.epam.reportportal.utils.markdown.MarkdownUtils;
 import com.epam.reportportal.utils.properties.SystemAttributesExtractor;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
@@ -32,7 +35,6 @@ import com.epam.ta.reportportal.ws.model.ParameterResource;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
-import com.google.common.io.ByteSource;
 import cucumber.api.*;
 import cucumber.api.event.*;
 import cucumber.runtime.StepDefinitionMatch;
@@ -155,11 +157,11 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	@Nullable
 	@SuppressWarnings("unchecked")
 	protected TestCaseIdEntry getTestCaseId(@Nonnull TestStep testStep, @Nullable String codeRef) {
-		Field definitionMatchField = getDefinitionMatchField(testStep);
+		Object definitionMatch = getDefinitionMatch(testStep);
 		List<cucumber.api.Argument> arguments = ((PickleStepTestStep) testStep).getDefinitionArgument();
-		if (definitionMatchField != null) {
+		if (definitionMatch != null) {
 			try {
-				Method method = retrieveMethod(definitionMatchField, testStep);
+				Method method = retrieveMethod((StepDefinitionMatch) definitionMatch);
 				return TestCaseIdUtils.getTestCaseId(method.getAnnotation(TestCaseId.class),
 						method,
 						codeRef,
@@ -299,6 +301,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		}
 
 		FinishTestItemRQ rq = buildFinishTestItemRequest(itemId, null, mapItemStatus(status));
+		//noinspection ReactiveStreamsUnusedPublisher
 		launch.get().finishTestItem(itemId, rq);
 		return rq.getEndTime();
 	}
@@ -626,6 +629,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 			return;
 		}
 		FinishTestItemRQ rq = buildFinishTestItemRequest(itemId, dateTime, null);
+		//noinspection ReactiveStreamsUnusedPublisher
 		launch.get().finishTestItem(itemId, rq);
 	}
 
@@ -833,7 +837,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 */
 	@Nonnull
 	protected String formatDataTable(@Nonnull final List<List<String>> table) {
-		return Utils.formatDataTable(table);
+		return MarkdownUtils.formatDataTable(table);
 	}
 
 	/**
@@ -905,10 +909,10 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 */
 	@Nullable
 	protected Set<ItemAttributesRQ> getAttributes(@Nonnull TestStep testStep) {
-		Field definitionMatchField = getDefinitionMatchField(testStep);
-		if (definitionMatchField != null) {
+		Object definitionMatch = getDefinitionMatch(testStep);
+		if (definitionMatch != null) {
 			try {
-				Method method = retrieveMethod(definitionMatchField, testStep);
+				Method method = retrieveMethod((StepDefinitionMatch) definitionMatch);
 				Attributes attributesAnnotation = method.getAnnotation(Attributes.class);
 				if (attributesAnnotation != null) {
 					return AttributeParser.retrieveAttributes(attributesAnnotation);
@@ -928,9 +932,8 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 */
 	@Nullable
 	protected String getCodeRef(@Nonnull TestStep testStep) {
-		return ofNullable(getDefinitionMatchField(testStep)).flatMap(match -> {
+		return ofNullable(getDefinitionMatch(testStep)).map(m -> (StepDefinitionMatch) m).flatMap(stepDefinitionMatch -> {
 			try {
-				StepDefinitionMatch stepDefinitionMatch = (StepDefinitionMatch) match.get(testStep);
 				Field stepDefinitionField = stepDefinitionMatch.getClass().getDeclaredField(STEP_DEFINITION_FIELD_NAME);
 				stepDefinitionField.setAccessible(true);
 				Object javaStepDefinition = stepDefinitionField.get(stepDefinitionMatch);
@@ -1033,26 +1036,17 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 */
 	@Nonnull
 	protected Pair<String, String> getHookTypeAndName(@Nonnull HookType hookType) {
-		String name = null;
-		String type = null;
 		switch (hookType) {
 			case Before:
-				name = "Before hooks";
-				type = "BEFORE_TEST";
-				break;
+				return Pair.of(ItemType.BEFORE_TEST.name(), "Before hooks");
 			case After:
-				name = "After hooks";
-				type = "AFTER_TEST";
-				break;
+				return Pair.of(ItemType.AFTER_TEST.name(), "After hooks");
 			case AfterStep:
-				name = "After step";
-				type = "AFTER_METHOD";
-				break;
+				return Pair.of(ItemType.AFTER_METHOD.name(), "After step");
 			case BeforeStep:
-				name = "Before step";
-				type = "BEFORE_METHOD";
-				break;
+				return Pair.of(ItemType.BEFORE_METHOD.name(), "Before step");
+			default:
+				return Pair.of(ItemType.TEST.name(), "Hook");
 		}
-		return Pair.of(type, name);
 	}
 }

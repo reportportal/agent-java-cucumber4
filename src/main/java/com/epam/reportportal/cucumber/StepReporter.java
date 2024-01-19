@@ -15,6 +15,7 @@
  */
 package com.epam.reportportal.cucumber;
 
+import com.epam.reportportal.listeners.ItemType;
 import io.reactivex.Maybe;
 
 import javax.annotation.Nonnull;
@@ -36,13 +37,12 @@ import java.util.Optional;
  * created in hooks will be attached to these, and not to the actual failing
  * steps!)
  *
- * @author Sergey_Gvozdyukevich
- * @author Serhii Zharskyi
- * @author Vitaliy Tsvihun
+ * @deprecated Use {@link ScenarioReporter}, since the semantic of this class is completely broken and will be removed
  */
+@Deprecated
 public class StepReporter extends AbstractReporter {
-	private static final String RP_STORY_TYPE = "STORY";
-	private static final String RP_TEST_TYPE = "SCENARIO";
+	private static final String RP_STORY_TYPE = ItemType.STORY.name();
+	private static final String RP_TEST_TYPE = ItemType.SCENARIO.name();
 
 	public StepReporter() {
 		super();
