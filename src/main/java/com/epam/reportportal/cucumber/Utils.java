@@ -17,16 +17,15 @@ package com.epam.reportportal.cucumber;
 
 import com.epam.reportportal.listeners.ItemStatus;
 import com.epam.reportportal.listeners.LogLevel;
+import com.epam.reportportal.utils.reflect.Accessible;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
 import cucumber.runtime.StepDefinitionMatch;
 
-import javax.annotation.Nonnull;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static java.util.Optional.ofNullable;
 
@@ -35,11 +34,6 @@ public class Utils {
 	private static final String DEFINITION_MATCH_FIELD_NAME = "definitionMatch";
 	private static final String STEP_DEFINITION_FIELD_NAME = "stepDefinition";
 	private static final String METHOD_FIELD_NAME = "method";
-	public static final String ONE_SPACE = "\u00A0";
-	private static final String NEW_LINE = "\r\n";
-	public static final String TABLE_INDENT = "\u00A0\u00A0\u00A0\u00A0";
-	public static final String TABLE_COLUMN_SEPARATOR = "|";
-	public static final String TABLE_ROW_SEPARATOR = "-";
 
 	private Utils() {
 		throw new AssertionError("No instances should exist for the class!");
@@ -88,8 +82,7 @@ public class Utils {
 		return (prefix == null ? EMPTY : prefix) + infix + argument;
 	}
 
-	public static Method retrieveMethod(Field definitionMatchField, TestStep testStep) throws IllegalAccessException, NoSuchFieldException {
-		StepDefinitionMatch stepDefinitionMatch = (StepDefinitionMatch) definitionMatchField.get(testStep);
+	public static Method retrieveMethod(StepDefinitionMatch stepDefinitionMatch) throws IllegalAccessException, NoSuchFieldException {
 		Field stepDefinitionField = stepDefinitionMatch.getClass().getDeclaredField(STEP_DEFINITION_FIELD_NAME);
 		stepDefinitionField.setAccessible(true);
 		Object javaStepDefinition = stepDefinitionField.get(stepDefinitionMatch);
@@ -101,69 +94,11 @@ public class Utils {
 	public static final java.util.function.Function<List<cucumber.api.Argument>, List<?>> ARGUMENTS_TRANSFORM = arguments -> ofNullable(
 			arguments).map(args -> args.stream().map(cucumber.api.Argument::getValue).collect(Collectors.toList())).orElse(null);
 
-	public static Field getDefinitionMatchField(TestStep testStep) {
-
-		Class<?> clazz = testStep.getClass();
-
+	public static Object getDefinitionMatch(TestStep testStep) {
 		try {
-			return clazz.getField(DEFINITION_MATCH_FIELD_NAME);
+			return Accessible.on(testStep).field(DEFINITION_MATCH_FIELD_NAME).getValue();
 		} catch (NoSuchFieldException e) {
-			do {
-				try {
-					Field definitionMatchField = clazz.getDeclaredField(DEFINITION_MATCH_FIELD_NAME);
-					definitionMatchField.setAccessible(true);
-					return definitionMatchField;
-				} catch (NoSuchFieldException ignore) {
-				}
-
-				clazz = clazz.getSuperclass();
-			} while (clazz != null);
-
 			return null;
 		}
-	}
-
-	/**
-	 * Converts a table represented as List of Lists to a formatted table string
-	 *
-	 * @param table a table object
-	 * @return string representation of the table
-	 */
-	@Nonnull
-	public static String formatDataTable(@Nonnull final List<List<String>> table) {
-		StringBuilder result = new StringBuilder();
-		int tableLength = table.stream().mapToInt(List::size).max().orElse(-1);
-		List<Iterator<String>> iterList = table.stream().map(List::iterator).collect(Collectors.toList());
-		List<Integer> colSizes = IntStream.range(0, tableLength)
-				.mapToObj(n -> iterList.stream().filter(Iterator::hasNext).map(Iterator::next).collect(Collectors.toList()))
-				.map(col -> col.stream().mapToInt(String::length).max().orElse(0))
-				.collect(Collectors.toList());
-
-		boolean header = true;
-		for (List<String> row : table) {
-			result.append(TABLE_INDENT).append(TABLE_COLUMN_SEPARATOR);
-			for (int i = 0; i < row.size(); i++) {
-				String cell = row.get(i);
-				int maxSize = colSizes.get(i) - cell.length() + 2;
-				int lSpace = maxSize / 2;
-				int rSpace = maxSize - lSpace;
-				IntStream.range(0, lSpace).forEach(j -> result.append(ONE_SPACE));
-				result.append(cell);
-				IntStream.range(0, rSpace).forEach(j -> result.append(ONE_SPACE));
-				result.append(TABLE_COLUMN_SEPARATOR);
-			}
-			if (header) {
-				header = false;
-				result.append(NEW_LINE);
-				result.append(TABLE_INDENT).append(TABLE_COLUMN_SEPARATOR);
-				for (int i = 0; i < row.size(); i++) {
-					int maxSize = colSizes.get(i) + 2;
-					IntStream.range(0, maxSize).forEach(j -> result.append(TABLE_ROW_SEPARATOR));
-					result.append(TABLE_COLUMN_SEPARATOR);
-				}
-			}
-			result.append(NEW_LINE);
-		}
-		return result.toString().trim();
 	}
 }
