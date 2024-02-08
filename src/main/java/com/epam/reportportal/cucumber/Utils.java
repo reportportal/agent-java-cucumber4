@@ -20,9 +20,7 @@ import com.epam.reportportal.listeners.LogLevel;
 import com.epam.reportportal.utils.reflect.Accessible;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
-import cucumber.runtime.StepDefinitionMatch;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -82,13 +80,13 @@ public class Utils {
 		return (prefix == null ? EMPTY : prefix) + infix + argument;
 	}
 
-	public static Method retrieveMethod(StepDefinitionMatch stepDefinitionMatch) throws IllegalAccessException, NoSuchFieldException {
-		Field stepDefinitionField = stepDefinitionMatch.getClass().getDeclaredField(STEP_DEFINITION_FIELD_NAME);
-		stepDefinitionField.setAccessible(true);
-		Object javaStepDefinition = stepDefinitionField.get(stepDefinitionMatch);
-		Field methodField = javaStepDefinition.getClass().getDeclaredField(METHOD_FIELD_NAME);
-		methodField.setAccessible(true);
-		return (Method) methodField.get(javaStepDefinition);
+	public static Method retrieveMethod(Object stepDefinitionMatch) throws IllegalAccessException, NoSuchFieldException {
+		Object javaStepDefinition = Accessible.on(stepDefinitionMatch).field(STEP_DEFINITION_FIELD_NAME).getValue();
+		Method method = null;
+		if (javaStepDefinition != null) {
+			method = (Method) Accessible.on(javaStepDefinition).field(METHOD_FIELD_NAME).getValue();
+		}
+		return method;
 	}
 
 	public static final java.util.function.Function<List<cucumber.api.Argument>, List<?>> ARGUMENTS_TRANSFORM = arguments -> ofNullable(

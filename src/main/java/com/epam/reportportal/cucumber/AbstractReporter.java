@@ -161,7 +161,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		List<cucumber.api.Argument> arguments = ((PickleStepTestStep) testStep).getDefinitionArgument();
 		if (definitionMatch != null) {
 			try {
-				Method method = retrieveMethod((StepDefinitionMatch) definitionMatch);
+				Method method = retrieveMethod(definitionMatch);
 				return TestCaseIdUtils.getTestCaseId(method.getAnnotation(TestCaseId.class),
 						method,
 						codeRef,
@@ -332,7 +332,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		currentScenarioContextMap.remove(Pair.of(context.getLine(), featureUri));
 		Date endTime = finishTestItem(context.getId(), event.result.getStatus());
 		featureEndTime.put(featureUri, endTime);
-		currentScenarioContext.set(null);
+		currentScenarioContext.remove();
 		removeFromTree(currentFeatureContextMap.get(context.getFeatureUri()), context);
 	}
 
@@ -342,7 +342,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	protected void startLaunch() {
 		launch = new MemoizingSupplier<>(new Supplier<Launch>() {
 
-			/* should no be lazy */
+			/* should not be lazy */
 			private final Date startTime = Calendar.getInstance().getTime();
 
 			@Override
@@ -912,7 +912,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		Object definitionMatch = getDefinitionMatch(testStep);
 		if (definitionMatch != null) {
 			try {
-				Method method = retrieveMethod((StepDefinitionMatch) definitionMatch);
+				Method method = retrieveMethod(definitionMatch);
 				Attributes attributesAnnotation = method.getAnnotation(Attributes.class);
 				if (attributesAnnotation != null) {
 					return AttributeParser.retrieveAttributes(attributesAnnotation);
