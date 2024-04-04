@@ -27,6 +27,7 @@ import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.service.tree.TestItemTree;
 import com.epam.reportportal.utils.*;
 import com.epam.reportportal.utils.files.ByteSource;
+import com.epam.reportportal.utils.http.ContentType;
 import com.epam.reportportal.utils.markdown.MarkdownUtils;
 import com.epam.reportportal.utils.properties.SystemAttributesExtractor;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
@@ -46,7 +47,6 @@ import gherkin.pickles.PickleString;
 import gherkin.pickles.PickleTable;
 import gherkin.pickles.PickleTag;
 import io.reactivex.Maybe;
-import okhttp3.MediaType;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -574,15 +574,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 * @param data     data to attach
 	 */
 	protected void embedding(@Nullable String name, String mimeType, byte[] data) {
-		String type = ofNullable(mimeType).filter(m -> {
-			try {
-				MediaType.get(m);
-				return true;
-			} catch (IllegalArgumentException e) {
-				LOGGER.warn("Incorrect media type '{}'", m);
-				return false;
-			}
-		}).orElseGet(() -> getDataType(data, name));
+		String type = ofNullable(mimeType).filter(ContentType::isValidType).orElseGet(() -> getDataType(data, name));
 		String attachmentName = ofNullable(name).filter(m -> !m.isEmpty())
 				.orElseGet(() -> ofNullable(type).map(t -> t.substring(0, t.indexOf("/"))).orElse(""));
 		ReportPortal.emitLog(new ReportPortalMessage(ByteSource.wrap(data), type, attachmentName),
