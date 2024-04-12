@@ -116,6 +116,10 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 * This map uses to record the description of the scenario and the step to append the error to the description.
 	 */
 	private final Map<String, String> descriptionsMap = new ConcurrentHashMap<>();
+	/**
+	 * This map uses to record errors to append to the description.
+	 */
+	private final Map<String, Throwable> errorMap = new ConcurrentHashMap<>();
 
 	public static ReportPortal getReportPortal() {
 		return REPORT_PORTAL;
@@ -251,7 +255,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		StartTestItemRQ startTestItemRQ = buildStartScenarioRequest(scenarioContext.getTestCase(), scenarioName, featureContext.getUri(), scenarioContext.getLine());
 		Maybe<String> id = startScenario(featureContext.getFeatureId(), startTestItemRQ);
 		scenarioContext.setId(id);
-		descriptionsMap.put(scenarioContext.getId().blockingGet(), ofNullable(startTestItemRQ.getDescription()).orElse(StringUtils.EMPTY));
+		id.subscribe(scenarioId -> descriptionsMap.put(scenarioId, ofNullable(startTestItemRQ.getDescription()).orElse(StringUtils.EMPTY)));
 		if (launch.get().getParameters().isCallbackReportingEnabled()) {
 			addToTree(featureContext, scenarioContext);
 		}
@@ -288,18 +292,21 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 */
 	@Nonnull
 	@SuppressWarnings("unused")
-	protected FinishTestItemRQ buildFinishTestItemRequest(@Nonnull Maybe<String> itemId, @Nullable Date finishTime,
-			@Nullable ItemStatus status, @Nullable Throwable error) {
-		FinishTestItemRQ rq = new FinishTestItemRQ();
-		if (status == ItemStatus.FAILED) {
-			Optional<String> currentDescription = Optional.ofNullable(descriptionsMap.get(itemId.blockingGet()));
-			currentDescription.flatMap(description -> Optional.ofNullable(error)
-							.map(errorMessage -> resolveDescriptionErrorMessage(description, errorMessage)))
-					.ifPresent(rq::setDescription);
-		}
-		ofNullable(status).ifPresent(s -> rq.setStatus(s.name()));
-		rq.setEndTime(ofNullable(finishTime).orElse(Calendar.getInstance().getTime()));
-		return rq;
+	protected Maybe<FinishTestItemRQ> buildFinishTestItemRequest(@Nonnull Maybe<String> itemId, @Nullable Date finishTime,
+																 @Nullable ItemStatus status) {
+		return itemId.map(id -> {
+			FinishTestItemRQ rq = new FinishTestItemRQ();
+			if (status == ItemStatus.FAILED) {
+				Optional<String> currentDescription = Optional.ofNullable(descriptionsMap.get(itemId.blockingGet()));
+				Optional<Throwable> currentError = Optional.ofNullable(errorMap.get(itemId.blockingGet()));
+				currentDescription.flatMap(description -> currentError
+								.map(errorMessage -> resolveDescriptionErrorMessage(description, errorMessage)))
+						.ifPresent(rq::setDescription);
+			}
+			ofNullable(status).ifPresent(s -> rq.setStatus(s.name()));
+			rq.setEndTime(finishTime);
+			return rq;
+		});
 	}
 
 	/**
@@ -322,16 +329,17 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 * @param status the status of the item
 	 * @return a date and time object of the finish event
 	 */
-	protected Date finishTestItem(Maybe<String> itemId, Result.Type status, @Nullable Throwable error) {
+	protected Date finishTestItem(Maybe<String> itemId, Result.Type status) {
 		if (itemId == null) {
 			LOGGER.error("BUG: Trying to finish unspecified test item.");
 			return null;
 		}
 
-		FinishTestItemRQ rq = buildFinishTestItemRequest(itemId, null, mapItemStatus(status), error);
+		Date endTime = Calendar.getInstance().getTime();
+		Maybe<FinishTestItemRQ> rqMaybe = buildFinishTestItemRequest(itemId, endTime, mapItemStatus(status));
 		//noinspection ReactiveStreamsUnusedPublisher
-		launch.get().finishTestItem(itemId, rq);
-		return rq.getEndTime();
+		rqMaybe.subscribe(rq -> launch.get().finishTestItem(itemId, rq));
+		return endTime;
 	}
 
 	/**
@@ -340,7 +348,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 * @param itemId an ID of the item
 	 */
 	protected void finishTestItem(Maybe<String> itemId) {
-		finishTestItem(itemId, null, null);
+		finishTestItem(itemId, null);
 	}
 
 	private void removeFromTree(RunningContext.FeatureContext featureContext, RunningContext.ScenarioContext scenarioContext) {
@@ -358,7 +366,11 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
 		String featureUri = context.getFeatureUri();
 		currentScenarioContextMap.remove(Pair.of(context.getLine(), featureUri));
-		Date endTime = finishTestItem(context.getId(), event.result.getStatus(), event.result.getError());
+		if (mapItemStatus(event.result.getStatus()) == ItemStatus.FAILED) {
+			Optional.ofNullable(event.result.getError())
+					.ifPresent(error -> context.getId().subscribe(id -> errorMap.put(id, error)));
+		}
+		Date endTime = finishTestItem(context.getId(), event.result.getStatus());
 		featureEndTime.put(featureUri, endTime);
 		currentScenarioContext.remove();
 		removeFromTree(currentFeatureContextMap.get(context.getFeatureUri()), context);
@@ -465,7 +477,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 		String stepText = step.getText();
 		context.setCurrentText(stepText);
 		if (rq.isHasStats()) {
-			descriptionsMap.put(stepId.blockingGet(), ofNullable(rq.getDescription()).orElse(StringUtils.EMPTY));
+			stepId.subscribe(id -> descriptionsMap.put(id, ofNullable(rq.getDescription()).orElse(StringUtils.EMPTY)));
 		}
 		if (launch.get().getParameters().isCallbackReportingEnabled()) {
 			addToTree(context, stepText, stepId);
@@ -480,7 +492,11 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	protected void afterStep(Result result) {
 		reportResult(result, null);
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
-		finishTestItem(context.getCurrentStepId(), result.getStatus(), result.getError());
+		if (mapItemStatus(result.getStatus()) == ItemStatus.FAILED){
+			Optional.ofNullable(result.getError())
+					.ifPresent(error -> context.getCurrentStepId().subscribe(id -> errorMap.put(id, error)));
+		}
+		finishTestItem(context.getCurrentStepId(), result.getStatus());
 		context.setCurrentStepId(null);
 	}
 
@@ -531,7 +547,7 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 	 */
 	protected void afterHooks(HookType hookType) {
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
-		finishTestItem(context.getHookStepId(), context.getHookStatus(), null);
+		finishTestItem(context.getHookStepId(), context.getHookStatus());
 		context.setHookStepId(null);
 		if (hookType == HookType.AfterStep) {
 			removeFromTree(context, context.getCurrentText());
@@ -650,9 +666,10 @@ public abstract class AbstractReporter implements ConcurrentEventListener {
 			LOGGER.error("BUG: Trying to finish unspecified test item.");
 			return;
 		}
-		FinishTestItemRQ rq = buildFinishTestItemRequest(itemId, dateTime, null, null);
+		Date endTime = ofNullable(dateTime).orElse(Calendar.getInstance().getTime());
+		Maybe<FinishTestItemRQ> rqMaybe = buildFinishTestItemRequest(itemId, endTime, null);
 		//noinspection ReactiveStreamsUnusedPublisher
-		launch.get().finishTestItem(itemId, rq);
+		rqMaybe.subscribe(rq -> launch.get().finishTestItem(itemId, rq));
 	}
 
 	private void removeFromTree(RunningContext.FeatureContext featureContext) {
