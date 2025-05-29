@@ -5,6 +5,7 @@ import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.ReportPortalClient;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
+import com.epam.ta.reportportal.ws.model.launch.StartLaunchRS;
 import io.reactivex.Maybe;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,7 +60,7 @@ public class LaunchSystemAttributesTest {
 	@Test
 	public void shouldRetrieveSystemAttributes() {
 		when(reportPortalClient.startLaunch(any(StartLaunchRQ.class))).then(t -> Maybe.create(emitter -> {
-			emitter.onSuccess("launchId");
+			emitter.onSuccess(new StartLaunchRS("launchId", 1L));
 			emitter.onComplete();
 		}).cache());
 
